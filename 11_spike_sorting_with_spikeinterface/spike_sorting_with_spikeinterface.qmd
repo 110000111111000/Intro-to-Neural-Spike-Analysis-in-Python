@@ -1,0 +1,506 @@
+---
+title: "Preprocessing and Spike Sorting with SpikeInterface"
+engine: Jupyter
+format: html
+filter:
+    - assign
+number-sections: true
+number-depth: 2
+---
+
+### Import Dependencies
+```{python}
+import os
+import requests
+import zipfile
+import numpy as np
+from matplotlib import pyplot as plt
+import spikeinterface.full as si
+import probeinterface as pi
+from probeinterface.plotting import plot_probe
+
+%matplotlib inline
+```
+
+### Installing Dependencies and Downloading Data
+
+Install the conda environment from `environment.yml` and select is as the kernel for this notebook.
+
+```bash
+conda env create -f environment.yml
+```
+
+Then, run the cell below to download the data set for this session (this may take a while).
+
+```{python}
+
+url = "https://uni-bonn.sciebo.de/s/lFAt1OuziUxdMkX/download"
+
+if not os.path.exists("openephys_recording"):
+    response = requests.get(url)
+    with open("openephys_recording.zip", "wb") as file:
+        file.write(response.content)
+
+    with zipfile.ZipFile("openephys_recording.zip", "r") as zip_ref:
+        zip_ref.extractall("")
+    os.remove("openephys_recording.zip")
+```
+
+## Working with Recordings
+
+SpikeInterface provides extractors for many different formats, for a full listing see the dictionary stored in `si.recording_extractor_full_dict`
+
+| Code | Description |
+| --- | --- |
+| `rec = si.read_openephys("/recording/")` | Read data in the Open Ephys format from the folder `"/recording"` and assign the returned object to the variable `rec` |
+| `rec.get_num_channels()` | Get the number of channels in the recoding `rec` |
+| `rec.get_duration()` | Get the total duration of the recording `rec` |
+| `rec.get_sampling_frequency()` | Get the sampling frequency of the recording `rec` |
+| `seg = rec.frame_slice(start_frame=0, end_frame=1000)` | Get the first 1000 samples of the recording `rec` and assign them to a new variable `seg` |
+| `rec.get_traces(start_frame=i, stop_frame=j)` | Get a numpy array that contains the data recorded between samples `i` and `j` |
+
+---
+
+```{python}
+data_dir = "openephys_recording/2023-08-23_15-56-05"
+```
+
+:::{#exm-}
+Load the recording stream with the id `"1"`, which contains the **auxiliary channels**, assign the returned `RecordingExtractor` to a variable called `aux_rec` and print it.
+
+```{python}
+rec = si.read_openephys(data_dir, stream_id="1")
+``` 
+:::
+
+:::{#exr-}
+Load the stream with the id `"0"` and assign the returned `RecordingExtractor` to a variable called `rec`.
+:::
+:::{sol.}
+```{python}
+rec = si.read_openephys(data_dir, stream_id="0")
+rec
+```
+:::
+
+:::{#exr-}
+Get the duration of the recording
+:::
+:::{sol.}
+```{python}
+rec.get_duration()
+```
+:::
+
+:::{#exr-}
+Get the sampling frequency of the recording
+:::
+:::{sol.}
+```{python}
+rec.get_sampling_frequency()
+```
+:::
+
+:::{#exm-}
+Use the `frame_slice` method to select the first `10` seconds of the recording `rec`. Assign the returned object to a new variable `seg` and get it's duration.
+```{python}
+seg = rec.frame_slice(start_frame=0 * fs, end_frame=10 * fs)
+seg.get_duration()
+```
+:::
+
+:::{#exr-}
+Use the `frame_slice` method to select the first `60` seconds of the recording `rec`. Assign the returned object to a new variable `seg` and get it's duration.
+:::
+:::{sol.}
+```{python}
+seg = rec.frame_slice(start_frame=0 * fs, end_frame=60 * fs)
+seg.get_duration()
+```
+:::
+
+:::{#exr-}
+Use the `frame_slice` method to select the last `20` seconds of the recording `rec`. Assign the returned object to a new variable `seg` and get it's duration.
+:::
+:::{sol.}
+```{python}
+seg = rec.frame_slice(start_frame=(rec.get_duration()-20) * fs, end_frame=rec.get_duration() * fs)
+seg.get_duration()
+```
+:::
+
+
+:::{#exm-}
+Extract the traces for the recording between `0.5` and `0.7` seconds, assign the returned numpy array to a variable called `traces`, then print it's `.shape`.
+
+```{python}
+t_start = 0.5
+t_stop = 0.7
+fs = rec.get_sampling_frequency()
+traces = rec.get_traces(start_frame=fs * t_start, end_frame=fs * t_stop)
+traces.shape
+```
+:::
+
+:::{#exm-}
+Plot the extracted `traces` for the first 3 channels
+```{python}
+time = np.linspace(t_start, t_stop, num=len(traces))
+plt.plot(time, traces[:,:3])
+plt.xlabel("Time [s]")
+plt.ylabel("Voltage [muV]")
+```
+:::
+
+:::{#exr-}
+Extract the traces for the recording between `15` and `20` seconds, assign the returned numpy array to a variable called `traces`, then print it's `.shape`.
+:::
+:::{sol.}
+```{python}
+t_start = 15
+t_stop = 20
+fs = rec.get_sampling_frequency()
+traces = rec.get_traces(start_frame=int(fs * t_start), end_frame=int(fs * t_stop))
+traces.shape
+```
+:::
+
+:::{#exr-extract}
+Extract the traces for the recording between `60.1` and `60.2` seconds, assign the returned numpy array to a variable called `traces`, then print it's `.shape`.
+:::
+:::{sol.}
+```{python}
+t_start = 60.1
+t_stop = 60.2
+fs = rec.get_sampling_frequency()
+traces = rec.get_traces(start_frame=int(fs * t_start), end_frame=int(fs * t_stop))
+traces.shape
+```
+:::
+
+:::{#exr-}
+Plot the extracted `traces` from @exr-extract for channel 7
+:::
+:::{sol.}
+```{python}
+time = np.linspace(t_start, t_stop, num=len(traces))
+plt.plot(time, traces[:,7])
+plt.xlabel("Time [s]")
+plt.ylabel("Voltage [muV]")
+```
+:::
+
+:::{#exr-}
+Plot the extracted `traces` from @exr-extract for the last 5 channels
+:::
+:::{sol.}
+```{python}
+time = np.linspace(t_start, t_stop, num=len(traces))
+plt.plot(time, traces[:,-5:])
+plt.xlabel("Time [s]")
+plt.ylabel("Voltage [muV]")
+```
+:::
+
+
+## Handling Probe Information
+
+| Code | Description |
+| --- | --- |
+| `probe = pi.get_probe("neuropixels", probe="NP2014")` | Get the `"NP2014"` probe from `"neuropixels"` and assign it to a variable `probe` |
+| `pi.get_available_pathways()` | List all pathways for connecting the probe and acquisition system available in ProbeInterface` |
+| `probe.wiring_to_device(pathway)` | Remap the probe's channels for a given pathway |
+| `plot_probe(probe)` | Plot the `probe` and it's channels |
+| `rec.set_probe(probe)` | Add the probe info to the recording object `rec` |
+| `probe = rec.get_probe()` | Get the probe info from `rec` and assign it to the variable `probe` |
+
+---
+
+:::{#exm-}
+Get the `"NP1010"` probe from `"neuropixels"`.
+```{python}
+manufacturer = 'neuropixels'
+probe_name = 'NP1010'
+probe = pi.get_probe(manufacturer, probe_name)
+probe
+```
+:::
+
+:::{#exm-}
+Plot the probe and adjust the axis limits to display the probe's tip
+```{python}
+fig, ax = plt.subplots()
+plot_probe(probe, ax=ax)
+ax.set(xlim=(-50, 100), ylim=(-200, 150))
+```
+:::
+
+:::{#exr-}
+Get the `"1S256"` probe from `"plexon"`
+:::
+:::{sol.}
+```{python}
+manufacturer = 'plexon'
+probe_name = '1S256'
+probe = pi.get_probe(manufacturer, probe_name)
+probe
+```
+:::
+
+:::{#exr-}
+Plot the probe and adjust the axis limits to display the probe's tip
+:::
+:::{sol.}
+```{python}
+fig, ax = plt.subplots()
+plot_probe(probe, ax=ax)
+ax.set(xlim=(-50, 75), ylim=(-150, 150))
+```
+:::
+
+:::{#exr-}
+Go to the [ProbeInterface library](https://github.com/SpikeInterface/probeinterface_library/tree/main) and select a new manufacturer and probe from there. Then, get the probe and plot it
+:::
+:::{sol.}
+```{python}
+probe = pi.get_probe("neuronexus", "A4x8-5mm-100-200-177")
+fig, ax = plt.subplots()
+plot_probe(probe, ax=ax)
+ax.set(xlim=(-50, 50), ylim=(-80, 150))
+```
+:::
+
+:::{#exm-}
+Load the `"ASSY-236-H5"` probe from `"cambridgeneurotech"` and remap the channels for the `"cambridgeneurotech_mini-amp-64"` wiring pathway. Then, plot the probe with the contact and device indices and adjust the axis limit to view the tip of the probe.
+```{python}
+probe = pi.get_probe("cambridgeneurotech", "assy-236-h5")
+probe.wiring_to_device('cambridgeneurotech_mini-amp-64')
+
+fig, ax = plt.subplots()
+plot_probe(probe, ax=ax, with_contact_id=True, with_device_index=True)
+ax.set(xlim=(-25, 50), ylim=(-50, 150))
+```
+:::
+
+:::{#exr-}
+Load the `"ASSY-236-H5"` probe from `"cambridgeneurotech"` and remap the channels for the `"ASSY-156>RHD2164"` wiring pathway. Then, plot the probe with the contact and device indices and adjust the axis limit to view the tip of the probe.
+:::
+:::{sol.}
+```{python}
+probe = pi.get_probe("cambridgeneurotech", "ASSY-236-H5")
+probe.wiring_to_device("ASSY-156>RHD2164")
+
+fig, ax = plt.subplots()
+plot_probe(probe, ax=ax, with_contact_id=True, with_device_index=True)
+ax.set(xlim=(-25, 50), ylim=(-50, 150))
+```
+:::
+
+:::{#exr-}
+List all of the available wiring pathways. Select one and apply it to the `"ASSY-236-H5"` probe from `"cambridgeneurotech"` and plot the probe (NOTE: not all wiring pathways are compatible with every device).
+:::
+```{python}
+pi.get_available_pathways()
+probe = pi.get_probe("cambridgeneurotech", "ASSY-236-H5")
+probe.wiring_to_device("ASSY-77>Adpt.A64-Om32_2x-sm-NN>two_RHD2132")
+
+fig, ax = plt.subplots()
+plot_probe(probe, ax=ax, with_contact_id=True, with_device_index=True)
+ax.set(xlim=(-25, 50), ylim=(-50, 150))
+```
+
+:::{#exr-}
+Add the `probe` to the recording `rec` using `.set_probe()` and then call `.get_probe()` method to verify the probe info was added to the recording.
+:::
+:::{sol.}
+```{python}
+rec = rec.set_probe(probe)
+rec.get_probe()
+```
+:::
+
+
+## Spike Sorting
+
+| Code | Description |
+| --- | --- |
+| `si.installed_sorters()` | List all sorters installed in the current environment |
+| `results = si.run_sorter(sorter_name, recording, output_folder)` | Apply a spike sorter to the `recordings`, save the results to the `output_folder` and assign the returned object to a variable `results` |
+| `results.get_num_units()` | Get the number of units in the spike sorting `results` |
+
+---
+
+:::{#exm-}
+Run the code below to load the recording, and add the probe information to it.
+```{python}
+rec = si.read_openephys(data_dir, stream_id="0")
+probe = pi.get_probe("cambridgeneurotech", "ASSY-236-H5")
+probe.wiring_to_device("cambridgeneurotech_mini-amp-64")
+rec = rec.set_probe(probe)
+```
+:::
+
+:::{#exr-}
+List all of the installed spike sorters
+:::
+:::{sol.}
+```{python}
+si.installed_sorters()
+```
+:::
+
+:::{#exm-}
+Select the first 30 seconds of the recording `rec` and run the spike sorter `"tridesclous2"` on the recording segment `seg`. Then, print the number of detected units (NOTE: if running the sorter takes too long, reduce the duration of `seg`).
+```{python}
+t_start = 0
+t_stop = 30
+fs = rec.get_sampling_frequency()
+seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
+sorting_TDC = si.run_sorter(
+    sorter_name="tridesclous2", recording=seg, output_folder="results_TDC"
+)
+sorting_TDC.get_num_units()
+```
+:::
+
+:::{#exr-}
+Run the spike sorter `"tridesclous2"` on the next 30 seconds of the recording `rec` and print the number of detected units (HINT: you'll either have to use a different `output_folder` or pass `remove_existing_folder=True`)
+:::
+:::{sol.}
+```{python}
+t_start = 30
+t_stop = 60
+fs = rec.get_sampling_frequency()
+seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
+sorting_TDC = si.run_sorter(
+    sorter_name="tridesclous2",
+    recording=seg,
+    remove_existing_folder=True,
+    output_folder="results_TDC",
+)
+sorting_TDC.get_num_units()
+```
+:::
+
+:::{#exr-}
+Run the spike sorter `"simple"` on the whole recording `rec`. Then, print the number of detected units.
+:::
+:::{sol.}
+```{python}
+sorting_SMP = si.run_sorter(
+    sorter_name="simple",
+    recording=rec,
+    remove_existing_folder=True,
+    output_folder="results_SMP",
+)
+sorting_SMP.get_num_units()
+```
+:::
+
+
+## Setting Sorting Parameters
+
+| Code | Description |
+| --- | --- |
+| `si.get_default_sorter_params(sorter_name)` | Get the default parmeters for a given spike sorter |
+
+---
+
+:::{#exr-}
+Get the default parameters for the spike sorter `"tridesclous2"`
+:::
+:::{sol.}
+```{python}
+si.get_default_sorter_params("tridesclous2")
+```
+:::
+
+:::{#exm-detection}
+Run the spike sorter `"tridesclous2"` on the first 30 seconds of the recording `rec` and set the `detection` parameter to `{"peak_sign": "neg", "detect_threshold":7, "exclude_sweep_ms":1.5}`. Then, print the number of detected units.
+```{python}
+t_start = 0
+t_stop = 30
+fs = rec.get_sampling_frequency()
+seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
+
+detection = {"peak_sign": "neg", "detect_threshold":7, "exclude_sweep_ms":1.5}
+sorting_TDC = si.run_sorter(
+    sorter_name="tridesclous2",
+    recording=seg,
+    output_folder="results_TDC",
+    remove_existing_folder=True,
+    detection=detection,
+)
+sorting_TDC.get_num_units()
+```
+:::
+
+
+:::{#exr-filtering}
+Run the spike sorter `"tridesclous2"` on the first 30 seconds of the recording `rec` and set the `filtering` parameter to `{"freq_min": 1000, "freq_max":9000}`. Then, print the number of detected units.
+:::
+:::{.sol}
+```{python}
+t_start = 0
+t_stop = 30
+fs = rec.get_sampling_frequency()
+seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
+
+filtering = {"freq_min": 1000, "freq_max": 9000}
+sorting_TDC = si.run_sorter(
+    sorter_name="tridesclous2",
+    recording=seg,
+    output_folder="results_TDC",
+    remove_existing_folder=True,
+    filtering=filtering,
+)
+sorting_TDC.get_num_units()
+```
+:::
+
+:::{#exr-}
+Run the spike sorter `"tridesclous2"` on the first 30 seconds of the recording `rec` and use the `detection` parameter with the values from @exm-detection and the `filtering` parameter with the values from @exr-exr-filtering. Then, print the number of detected units.
+:::
+:::{sol.}
+```{python}
+sorting_TDC = si.run_sorter(
+    sorter_name="tridesclous2",
+    recording=seg,
+    output_folder="results_TDC",
+    remove_existing_folder=True,
+    filtering=filtering,
+    detection=detection
+)
+sorting_TDC.get_num_units()
+```
+:::
+
+:::{#exr-}
+Get the default parameters for the spike sorter `"spykingcircus2"`
+:::
+:::{sol.}
+```{python}
+si.get_default_sorter_params("spykingcircus2")
+```
+:::
+
+:::{#exr-filtering}
+Run the spike sorter `"spykingcircus2"` on the first 30 seconds of the recording `rec` and set the `motion_correction` parameter to `{"preset":"rigid_fast"}`. Then, print the number of detected units.
+:::
+:::{.sol}
+```{python}
+t_start = 0
+t_stop = 30
+fs = rec.get_sampling_frequency()
+seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
+
+sorting_SPC = si.run_sorter(
+    sorter_name="spykingcircus2",
+    recording=seg,
+    output_folder="results_SPC",
+    remove_existing_folder=True,
+    motion_correction={"preset":"rigid_fast"}
+)
+sorting_SPC.get_num_units()
+```
+:::

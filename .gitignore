@@ -1,2 +1,5 @@
 *.html
 /*_files
+*/results_*/
+*/openephys_recording/
+/.quarto/

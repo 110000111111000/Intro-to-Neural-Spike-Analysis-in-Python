@@ -44,13 +44,18 @@ seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
 Running `"kilosort4"` will throw an error, because it is not installed
 ```{python}
 sorting_KS4 = si.run_sorter(
-    sorter_name="kilosort4", recording=seg, output_folder="results_KS4"
+    sorter_name="tridesclous2", recording=rec, folder="results_TDC",
+    remove_existing_folder=True
 )
 ```
 
 However, by setting `docker_image=True`, we can allow the `run_sorter()` function to download a docker image from the SpikeInterface library and run the sorter inside the cotainer.
 ```{python}
 sorting_KS4 = si.run_sorter(
-    sorter_name="kilosort4", recording=seg, output_folder="results_KS4", docker_image=True, delete_container_files=False
+    sorter_name="kilosort4",
+    recording=rec,
+    folder="results_KS4",
+    docker_image=True,
+    delete_container_files=False,
 )
 ```

@@ -1,0 +1,56 @@
+---
+title: "Running Sorters with Docker (Demo)"
+engine: Jupyter
+format: html
+filter:
+    - assign
+number-sections: true
+number-depth: 2
+---
+
+```{python}
+import spikeinterface.full as si
+import probeinterface as pi
+```
+
+Check which sorters are installed and which ones are available
+```{python}
+print("Installed sorters:", si.installed_sorters())
+print("Available sorters:", si.available_sorters())
+```
+
+Load the data and add probe information
+```{python}
+data_dir = "openephys_recording/2023-08-23_15-56-05"
+rec = si.read_openephys(data_dir, stream_id="0")
+probe = pi.get_probe("cambridgeneurotech", "ASSY-236-H5")
+probe.wiring_to_device("cambridgeneurotech_mini-amp-64")
+rec = rec.set_probe(probe)
+```
+
+Make sure docker is installed
+```{python}
+!docker --version
+```
+
+Select a short segment for demo purpose.
+```{python}
+t_start = 0
+t_stop = 10
+fs = rec.get_sampling_frequency()
+seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
+```
+
+Running `"kilosort4"` will throw an error, because it is not installed
+```{python}
+sorting_KS4 = si.run_sorter(
+    sorter_name="kilosort4", recording=seg, output_folder="results_KS4"
+)
+```
+
+However, by setting `docker_image=True`, we can allow the `run_sorter()` function to download a docker image from the SpikeInterface library and run the sorter inside the cotainer.
+```{python}
+sorting_KS4 = si.run_sorter(
+    sorter_name="kilosort4", recording=seg, output_folder="results_KS4", docker_image=True, delete_container_files=False
+)
+```

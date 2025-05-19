@@ -16,6 +16,34 @@ import probeinterface as pi
 %matplotlib inline
 ```
 
+Download the data for this session (this may take a moment)
+```{python}
+import os
+import zipfile
+import requests
+
+fnames = ["openephys_preprocessed", "results_KS4", "results_SPC", "results_TDC"]
+urls = [
+    "https://uni-bonn.sciebo.de/s/2LbWWs3VPVrQkLO",
+    "https://uni-bonn.sciebo.de/s/26X6qhAAYq1uJfZ",
+    "https://uni-bonn.sciebo.de/s/FnRPj7EQSYXFIEg",
+    "https://uni-bonn.sciebo.de/s/EkdnDNhvF68HC9D",
+]
+
+if not os.path.exists("../data"):
+    os.mkdir("../data")
+
+for url, fname in zip(urls, fnames):
+    if not os.path.exists(f"../data/{fname}"):
+        response = requests.get(f"{url}/download")
+        with open(f"{fname}.zip", "wb") as file:
+            file.write(response.content)
+
+        with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
+            zip_ref.extractall(f"../data/{fname}")
+        os.remove(f"{fname}.zip")
+```
+
 ## Extracting and Visualizing Spike Waveforms
 
 | Code | Description |

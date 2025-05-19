@@ -1,0 +1,509 @@
+---
+title: "Mining Statistical Patterns with SPADE"
+engine: Jupyter
+format: html
+filter:
+    - assign
+number-sections: true
+number-depth: 2
+---
+
+```{python}
+import sys
+from pathlib import Path
+import numpy as np
+from matplotlib import pyplot as plt
+import pandas as pd
+import quantities as pq
+from elephant.spike_train_generation import compound_poisson_process, homogeneous_poisson_process
+from elephant.spade import spade
+from viziphant.rasterplot import rasterplot, eventplot
+from viziphant.patterns import plot_patterns
+from neo.core import SpikeTrain
+
+sys.path.append("../")
+import utils
+
+np.random.seed(100)
+%matplotlib inline
+```
+
+```{python}
+import os
+import requests
+import zipfile
+
+url = "https://uni-bonn.sciebo.de/s/bIDNCBs37frcli8"
+fname = "allen"
+
+if not os.path.exists("../data"):
+    os.mkdir("../data")
+
+if not os.path.exists(f"../data/{fname}"):
+    response = requests.get(f"{url}/download")
+    with open(f"{fname}.zip", "wb") as file:
+        file.write(response.content)
+
+    with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
+        zip_ref.extractall(f"../data/{fname}")
+        # os.remove(f"{fname}.zip")
+```
+
+
+## Simulating Synchronous Spiking
+
+| Code | Description |
+| --- | --- |
+| `sts = compound_poission_process(rate, amplitude_distribution, t_stop)` | Generate a list of spike trains from a compound poission process with a given `rate` and `amplitude_distribution` that determines the probability of synchronous spikes. Each spike train starts at time 0 and goes to `t_stop` |
+| `rasterplot(sts)` | Create a raster plot for a list of spike trains |
+| `x,y = find_synchronous_spikes(spiketrains)` | Returns the times `x` and indices `y` of synchronous spikes in a list of `spiketrains` |
+
+---
+
+:::{#exm-}
+Generate 6 (`len(amplitude_distribution)-1`) spike trains with a firing rate of `5` Hz and a duration of `10` s from a `compound_poisson_process` where the probability of synchronous spikes in all 6 spike trains is `0.01` (1%).
+:::
+```{python}
+amplitude_distribution=[0, 0.99, 0, 0, 0, 0, 0.01]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+```
+
+:::{#exm-}
+Generate 9 (`len(amplitude_distribution)-1`) spike trains with a firing rate of `5` Hz and a duration of `10` s from a `compound_poisson_process` where the probability of synchronous spikes in 2 of the 9 spike trains is `0.03` (3%) and the probability of synchronous spikes in 8 of the 0 spike trains is `0.01` (1%).
+:::
+```{python}
+amplitude_distribution=[0, 0.96, 0.03, 0, 0, 0, 0, 0, 0.01, 0]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+```
+
+:::{#exr-}
+How many spike trains does the `compound_poissoin_process` in the cell below generate? What is the probability of a synchronous spike in all spike trains? Print the length of the returned spike train list `sts`.
+```{python}
+amplitude_distribution=[0, 0.7, 0, 0, 0.3]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+```
+:::
+:::{sol.}
+The probability of synchronous spikes in all trains is 30%.
+```{python}
+len(sts)
+```
+:::
+
+:::{#exr-}
+Generate 7 spike trains with a firing rate of `5` Hz and a duration of `10` s from a `compound_poisson_process` where the probability of synchronous spikes in all 9 spike trains is `0.1` (10%) and print the length of the returned list of spike trains
+:::
+:::{sol.}
+```{python}
+amplitude_distribution=[0, 0.9, 0, 0, 0, 0, 0, 0.1]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+print(len(sts))
+```
+:::
+
+:::{#exr-}
+Generate 4 spike trains with a firing rate of `5` Hz and a duration of `10` s from a `compound_poisson_process` where the probability of synchronous spikes in 2 of the 4 spike trains is `0.05` (5%) and the probability of a synchronous spike in 3 of the 4 spikes is `0.01` (1%) and print the length of the returned list of spike trains.
+:::
+:::{sol.}
+```{python}
+amplitude_distribution=[0, 0.94, 0.05, 0.01, 0]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+print(len(sts))
+```
+:::
+
+:::{#exm-}
+Find the time points `x` and the spike train indices `y` of spikes in the spike train list `sts` that occurr synchronousy in multiple trains.
+```{python}
+x, y = utils.find_synchronous_spikes(sts)
+```
+:::
+
+:::{#exm-}
+Create a `rasterplot` for the list of spike trains `sts` and highlight the synchronous spikes red.
+```{python}
+rasterplot(sts, color="black")
+plt.scatter(
+    x, y, color="red", label="synchronous spikes", marker="o", facecolors="none"
+)
+plt.ylabel("Spike Train")
+plt.ylim(-1, len(sts))
+plt.legend()
+```
+:::
+
+:::{#exr-}
+Create a raster plot for the list of spike trains `sts` generated in the cell below and highlight the synchronous spikes.
+```{python}
+amplitude_distribution=[0, 0.99, 0, 0, 0, 0.01]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+```
+:::
+:::{sol.}
+```{python}
+x, y = find_synchronous_spikes(sts)
+rasterplot(sts, color="black")
+plt.scatter(
+    x, y, color="red", label="synchronous spikes", marker="o", facecolors="none"
+)
+plt.ylabel("Spike Train")
+plt.ylim(-1, len(sts))
+plt.legend()
+```
+:::
+
+:::{#exr-}
+Create a raster plot for the list of spike trains `sts` generated in the cell below and highlight the synchronous spikes.
+```{python}
+amplitude_distribution=[0, 0.85, 0.1, 0, 0.05, 0, 0]
+sts = compound_poisson_process(
+    rate=5 * pq.Hz, amplitude_distribution=amplitude_distribution, t_stop=10 * pq.s
+)
+```
+:::
+:::{sol.}
+```{python}
+x, y = find_synchronous_spikes(sts)
+rasterplot(sts, color="black")
+plt.scatter(
+    x, y, color="red", label="synchronous spikes", marker="o", facecolors="none"
+)
+plt.ylabel("Spike Train")
+plt.ylim(-1, len(sts))
+plt.legend()
+```
+:::
+
+## Finding Synchronous Events with SPADE
+
+| Code | Description |
+| --- | --- |
+| `patterns = spade(spiketrains, binsize, winlen)["patterns"]` | Run the SPADE algorithm on a list of `spiketrains`, dividing them into bins of a given `binsize` and searching for synchronous activity within a window of a given `winlen`. Extract the detected `["patterns"]` and assign them to a variable `patterns` |
+
+---
+
+:::{#exm-}
+Generate 10 spike trains with synchronous spikes from a `compound_poisson_process` and add 90 purely random spike trains from a `homogeneous_poisson_process`.
+```{python}
+rate = 3 * pq.Hz
+t_stop = 15 * pq.s
+sts = compound_poisson_process(
+    rate=rate,
+    amplitude_distribution=[0, 0.5, 0, 0, 0, 0, 0, 0, 0, 0, 0.5],
+    t_stop=t_stop,
+)
+for i in range(90):
+    sts.append(homogeneous_poisson_process(rate=rate, t_stop=t_stop))
+print("Number of spike trains:", len(sts))
+```
+:::
+
+:::{#exm-}
+Apply SPADE to the simulated data with a `binsize` of 1 ms and a window length (`winlen`) of 1 bin. Create `100` surrogate data sets (`n_surr`) for statistical evaluation. Print the number of detected `patterns`.
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=5 * pq.ms,
+    winlen=1,
+    n_surr=100,
+)["patterns"]
+print("number of patterns found:", len(patterns))
+```
+:::
+
+:::{#exr-}
+Apply SPADE to the simulated data and change `binsize` to 3 ms. Print the number of detected `patterns`.
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=3 * pq.ms,
+    winlen=1,
+    n_surr=100,
+)["patterns"]
+print("number of patterns found:", len(patterns))
+```
+:::
+
+:::{#exr-spade1}
+Apply SPADE to the simulated data and set `binsize` to 3 ms and `winlen` to 5. Print the number of detected `patterns`.
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=3 * pq.ms,
+    winlen=5,
+    n_surr=100,
+)["patterns"]
+print("number of patterns found:", len(patterns))
+```
+:::
+
+
+:::{#exm-sig}
+Iterate all `patterns`, find the ones that are significant (p<0.05) and print the `'neurons'` and the `'signature'` that describes how often the pattern occurrs
+```{python}
+for pattern in patterns:
+    if pattern["pvalue"]<0.05:
+        print(f"Significant pattern with neurons {pattern['neurons']} ocurred {pattern['signature'][1]} times")
+```
+:::
+
+:::{#exr-min_occ}
+Rerun SPADE from @exr-spade1 but add the parameter `min_occ=5`. Then, print all significant patterns as demonstrated in @exm-sig.
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=3 * pq.ms,
+    winlen=5,
+    min_occ=5,
+    n_surr=100,
+)["patterns"]
+
+for pattern in patterns:
+    if pattern["pvalue"]<0.05:
+        print(f"Significant pattern with neurons {pattern['neurons']} ocurred {pattern['signature'][1]} times")
+```
+:::
+
+:::{#exr-}
+Run the cell below to generate a new list of spike trains. Then, rerun the code from @exr-min_occ to find the significant patterns in the spike trains. Did you find any patterns? If not, why?
+```{python}
+rate = 3 * pq.Hz
+t_stop = 15 * pq.s
+sts = compound_poisson_process(
+    rate=rate,
+    amplitude_distribution=[0, 0.99, 0, 0, 0, 0, 0, 0, 0, 0, 0.01],
+    t_stop=t_stop,
+)
+for i in range(90):
+    sts.append(homogeneous_poisson_process(rate=rate, t_stop=t_stop))
+print("Number of spike trains:", len(sts))
+```
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=3 * pq.ms,
+    winlen=5,
+    min_occ=5,
+    n_surr=100,
+)["patterns"]
+
+for pattern in patterns:
+    if pattern["pvalue"]<0.05:
+        print(f"Significant pattern with neurons {pattern['neurons']} ocurred {pattern['signature'][1]} times")
+```
+:::
+
+:::{#exr-}
+Rerun the code from @exr-min_occ again but set `min_occ=2`. Did you find any significant patterns now?
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=3 * pq.ms,
+    winlen=5,
+    min_occ=2,
+    n_surr=100,
+)["patterns"]
+
+for pattern in patterns:
+    if pattern["pvalue"] < 0.05:
+        print(
+            f"Significant pattern with neurons {pattern['neurons']} ocurred {pattern['signature'][1]} times"
+        )
+```
+:::
+
+## Visualize Patterns Detected with SPADE
+
+| Code | Descriptions |
+| --- | --- |
+| `plot_patterns(spiketrains, patterns)` | Create a raster plot for the list of `spiketrains` and highlight the given `patterns` |
+
+---
+
+:::{#exm-spade2}
+Simulate spike trains and 
+```{python}
+rate = 3 * pq.Hz
+t_stop = 15 * pq.s
+sts = compound_poisson_process(
+    rate=rate,
+    amplitude_distribution=[0, 0.95, 0, 0, 0.03, 0, 0, 0, 0, 0, 0.02],
+    t_stop=t_stop,
+)
+for i in range(90):
+    sts.append(homogeneous_poisson_process(rate=rate, t_stop=t_stop))
+
+patterns = spade(
+    spiketrains=sts,
+    binsize=1 * pq.ms,
+    winlen=1,
+    min_occ=3,
+    n_surr=100,
+)["patterns"]
+```
+:::
+
+:::{#exm-}
+Plot the first two `patterns` found by SPADE.
+```{python}
+plot_patterns(sts, [patterns[0], patterns[1]])
+```
+:::
+
+:::{#exr-}
+Plot the first three patterns found by SPADE.
+:::
+:::{sol.}
+```{python}
+plot_patterns(sts, [patterns[0], patterns[1], patterns[2]])
+```
+:::
+
+:::{#exr-}
+Plot the last two patterns found by SPADE.
+:::
+:::{sol.}
+```{python}
+plot_patterns(sts, [patterns[-2], patterns[-1]])
+```
+:::
+
+:::{#exr-siglist}
+Plot the `significant_patterns` extracted by the code in the cell blow.
+```{python}
+significant_patterns = []
+for pattern in patterns:
+    if pattern["pvalue"]<0.05:
+        significant_patterns.append(pattern)
+```
+:::
+
+:::{sol.}
+```{python}
+plot_patterns(sts, significant_patterns)
+```
+:::
+
+:::{#exr-}
+The cell below repeats the SPADE analysis from @exm-spade2 but adds a parameter for pattern set reduction `psr_param` that makes SPADE exclude patterns that are a subset of a larger patterns. Extract the list of significant patterns, as demonstrated in @exr-siglist and plot them.
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=1 * pq.ms,
+    winlen=1,
+    min_occ=3,
+    n_surr=100,
+    psr_param=[0,0,0]
+)["patterns"]
+```
+:::
+:::{sol.}
+```{python}
+significant_patterns = []
+for pattern in patterns:
+    if pattern["pvalue"]<0.05:
+        significant_patterns.append(pattern)
+plot_patterns(sts, significant_patterns)
+```
+:::
+
+## Applying SPADE to Real Data
+
+| Code | Description |
+| --- | --- |
+| `utils.get_available_sessions()` | Get the IDs of all recorded sessions |
+| `utils.load_spike_trains(session, max_dur=120, min_spikes=100)` | Load the spike trains from a given `session`, limit their duration to `120` seconds and only include neurons that spikes at least `100` times |
+
+---
+
+```{python}
+utils.get_available_sessions()
+```
+
+:::{#exm-}
+List the brain areas recorded in one `session`.
+```{python}
+session = utils.get_available_sessions()[14]
+print("Session", session)
+```
+:::
+
+:::{#exm-}
+Load the spike trains for all neurons in the anterolateral area `"AL"`, recorded during the given `session`. Limit the duration to `60` seconds and only include neurons that spiked at least `50` times. Then, print the number of returned spike trains.
+```{python}
+sts = utils.load_spike_trains(session, max_dur=60, min_spikes=50)
+print(f"Loaded {len(sts)} spike trains")
+```
+:::
+
+:::{#exr-}
+Run SPADE using a `binsize` of 1 ms  and a `winlen` of 2 to find patterns that occurr at minmum `20` times. Then, find all patterns that are statistically significant and visualize them.
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=1 * pq.ms,
+    winlen=2,
+    min_occ=20,
+    n_surr=100,
+    psr_param=[0, 0, 0],
+)["patterns"]
+
+significant_patterns = []
+for pattern in patterns:
+    if pattern["pvalue"] < 0.05:
+        significant_patterns.append(pattern)
+plot_patterns(sts, significant_patterns)
+```
+:::
+
+:::{#exr-}
+Rerun SPADE but set the `binsize` to 4 ms and the `winlen` to 10 bins. To counterbalance the increases search window, add the parameter `min_neu=3` to only search for patterns that encompass at least `3` neurons. Then, find all patterns that are statistically significant and visualize them.
+:::
+:::{sol.}
+```{python}
+patterns = spade(
+    spiketrains=sts,
+    binsize=4 * pq.ms,
+    winlen=10,
+    min_occ=20,
+    min_neu=3,
+    n_surr=100,
+    psr_param=[0, 0, 0],
+)["patterns"]
+
+significant_patterns = []
+for pattern in patterns:
+    if pattern["pvalue"] < 0.05:
+        significant_patterns.append(pattern)
+plot_patterns(sts, significant_patterns)
+```
+:::
+
+
+:::{#exr-}
+(Optional) experiment with SPADE! Load the data from different sessions and different brain areas and play with the parameters of SPADE (HINT: increasing `winlen` and `binsize` increases the total number patterns detected which increases the comutational load for statistical evaluation. To counter-balance, you can increase the value of `min_occ` and `min_neu` to only analyze patterns that occurr frequently and encompass a larger number of neurons or decrease the amount of data by changing the `max_dur` parameter in `load_spike_trains`.)
+:::

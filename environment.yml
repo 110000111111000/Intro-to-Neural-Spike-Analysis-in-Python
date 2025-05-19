@@ -1,4 +1,4 @@
-name: si_env
+name: spike
 channels:
   - conda-forge
   - defaults
@@ -12,6 +12,7 @@ dependencies:
   - matplotlib
   - h5py
   - pandas
+  - pyarrow
   - scikit-learn
   - networkx
   - hdbscan
@@ -21,6 +22,6 @@ dependencies:
   - pyqtgraph
   - pip:
     - spikeinterface[full,widgets]>=0.99
-    - spikeinterface-gui>=0.7
-    - docker
-    # - phy==2.0b5
+    - elephant
+    - viziphant
+    - pyocclient

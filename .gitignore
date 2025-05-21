@@ -7,3 +7,6 @@
 */waveforms/
 */sorting_curated/
 /data
+# pixi environments
+.pixi
+*.egg-info

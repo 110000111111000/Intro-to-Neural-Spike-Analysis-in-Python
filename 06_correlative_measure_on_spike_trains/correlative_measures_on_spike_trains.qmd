@@ -1,0 +1,497 @@
+---
+title: "Correlative Measures on Spike Trains"
+engine: Jupyter
+format: html
+filter:
+    - assign
+number-sections: true
+number-depth: 2
+---
+
+```{python}
+import numpy as np
+from matplotlib import pyplot as plt
+import quantities as pq
+from elephant.spike_train_generation import StationaryPoissonProcess, NonStationaryPoissonProcess
+from elephant.conversion import BinnedSpikeTrain
+from elephant.spike_train_correlation import (
+    covariance,
+    correlation_coefficient,
+    cross_correlation_histogram,
+)
+from viziphant.spike_train_correlation import (
+    plot_cross_correlation_histogram,
+    plot_corrcoef,
+)
+%matplotlib inline
+```
+
+```{python}
+from neo.core import AnalogSignal
+
+    @staticmethod
+    def pulse_NonStationaryPoissonProcess(
+        modulation_start,
+        modulation_duration,
+        modulation_amplitude,
+        t_stop,
+        base_rate=1 * pq.Hz,
+    ):
+        t = np.linspace(0 * pq.s, t_stop, int(t_stop.magnitude * 1000))
+        rate_signal = np.zeros(len(t)) * pq.Hz + base_rate
+        idx_start = np.argmin(np.abs(t - modulation_start))
+        idx_stop = np.argmin(np.abs(t - (modulation_start + modulation_duration)))
+        rate_signal[idx_start:idx_stop] += modulation_amplitude
+        rate_signal = AnalogSignal(rate_signal, sampling_rate=1000 * pq.Hz)
+        neuron = NonStationaryPoissonProcess(rate_signal)
+        return neuron
+
+```
+
+
+## Simulating Bursting Neurons with Non-Stationary Poisson Processes
+
+| Code | Description |
+| --- | --- |
+| `neuron = utils.pulse_NonStationaryProcess()` | Simulate a neuron as a non-stationary Poisson process with a firing rate that changes over time |
+| `neuron.rate_signal` | Access the time-varying `.rate_signal` of the simulated `neuron` |
+| `neuron.rate_signal.times` | Access the time points of the simulated neurons's `.rate_signal` |
+| `ax1 = plt.subplot(2, 1, 1)` | Generate the 1st plot in a 2-by-1 subplot an assign the returned object to a variable `ax1` |
+| `plt.subplot(2, 1, 2, sharex=ax1)` | Generate the 2nd plot in a 2-by-1 subplot and make it share the x-axis with `ax1` |
+
+---
+
+:::{#exm-}
+Use `utils.pulse_NonStationaryPoissonProcess()` to simulate a neuron that is active for **1.5s** with a base firing-rate of **5 Hz** that is modulated by a pulse which starts at of **0.7 s**, lasts **0.1 s** and has an amplitude of **100 Hz**. Then, plot the neuron's `.rate_signal`.
+```{python}
+neuron = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=0.7 * pq.s,
+    modulation_duration=0.1 * pq.s,
+    modulation_amplitude=100 * pq.Hz,
+    base_rate= 5* pq.Hz,
+    t_stop=1.5 * pq.s,
+)
+plt.plot(neuron.rate_signal.times, neuron.rate_signal)
+plt.xlabel("Time [s]")
+plt.ylabel("Modulation Amplitude [Hz]")
+```
+:::
+
+
+:::{#exm-}
+Generate a spike train from the simulated neuron and plot the neuron's rate signal together with an `eventplot` of the spike `.times`. Ensure that the subplots apply the same scaling on the x-axis by using the `sharex` argument in `plt.subplot()`.
+```{python}
+st = neuron.generate_spiketrain()
+ax1 = plt.subplot(2, 1, 1)
+plt.plot(neuron.rate_signal.times, neuron.rate_signal)
+plt.ylabel("Modulation Amplitude [Hz]")
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.eventplot(st.times)
+plt.xlabel("Time [s]")
+plt.yticks([])
+```
+:::
+
+:::{#exr-sim1}
+Use `utils.pulse_NonStationaryPoissonProcess()` to simulate a neuron that is active for **3s** with a base firing-rate of **10 Hz** that is modulated by a pulse which starts at of **1 s**, lasts **0.25 s** and has an amplitude of **50 Hz**. Then, plot the neuron's `.rate_signal`.
+:::
+:::{sol.}
+```{python}
+neuron = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1 * pq.s,
+    modulation_duration=0.25 * pq.s,
+    modulation_amplitude=50 * pq.Hz,
+    base_rate= 10* pq.Hz,
+    t_stop=3 * pq.s,
+)
+plt.plot(neuron.rate_signal.times, neuron.rate_signal)
+plt.xlabel("Time [s]")
+plt.ylabel("Modulation Amplitude [Hz]")
+```
+:::
+
+:::{#exr-}
+Generate a spike train from the simulated neuron from @exr-sim1 and plot the neuron's rate signal together with an `eventplot` of the spike `.times`. Ensure that the subplots apply the same scaling on the x-axis by using the `sharex` argument in `plt.subplot()`.
+:::
+:::{sol.}
+```{python}
+st = neuron.generate_spiketrain()
+ax1 = plt.subplot(2, 1, 1)
+plt.plot(neuron.rate_signal.times, neuron.rate_signal)
+plt.ylabel("Modulation Amplitude [Hz]")
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.eventplot(st.times)
+plt.xlabel("Time [s]")
+plt.yticks([])
+```
+:::
+
+:::{#exr-sim2}
+Use `utils.pulse_NonStationaryPoissonProcess()` to simulate a neuron that is active for **3s** with a base firing-rate of **0 Hz** that is modulated by a pulse which starts at of **1 s**, lasts **0.5 s** and has an amplitude of **20 Hz**. Then, plot the neuron's `.rate_signal`.
+:::
+:::{sol.}
+```{python}
+neuron = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1 * pq.s,
+    modulation_duration=0.5 * pq.s,
+    modulation_amplitude=20 * pq.Hz,
+    base_rate= 0* pq.Hz,
+    t_stop=3 * pq.s,
+)
+plt.plot(neuron.rate_signal.times, neuron.rate_signal)
+plt.xlabel("Time [s]")
+plt.ylabel("Modulation Amplitude [Hz]")
+```
+:::
+
+:::{#exr-}
+Generate a spike train from the simulated from @exr-sim2 and plot the neuron's rate signal together with an `eventplot` of the spike `.times`. Ensure that the subplots apply the same scaling on the x-axis by using the `sharex` argument in `plt.subplot()`.
+:::
+:::{sol.}
+```{python}
+st = neuron.generate_spiketrain()
+ax1 = plt.subplot(2, 1, 1)
+plt.plot(neuron.rate_signal.times, neuron.rate_signal)
+plt.ylabel("Modulation Amplitude [Hz]")
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.eventplot(st.times)
+plt.xlabel("Time [s]")
+plt.yticks([])
+```
+:::
+
+## Binning Spike Trains
+
+| Code | Description |
+| --- | --- |
+| `bst = BinnedSpikeTrain(st, bin_size)` | Convert the spike train `st` to a `BinnedSpiketrain` with a given `bin_size` |
+| `bst.bin_centers` | Access the time points at which the bins are centered |
+| `bst.to_array()` | Convert the bin counts in `bst` to a numy array |
+| `bst = bst.binarize()` | Convert the binned spike train to a binary representation |
+
+---
+
+:::{#exm-}
+Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **20 ms**. Then plot the spike train `st` together with the binned spike train `bst`.
+```{python}
+bst = BinnedSpikeTrain(st, bin_size=20 * pq.ms)
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot(st.times)
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.plot(bst.bin_centers, bst.to_array().flatten())
+```
+:::
+
+:::{#exr-}
+Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **80 ms**. Then plot the spike train `st` together with the binned spike train `bst`.
+:::
+:::{sol.}
+```{python}
+bst = BinnedSpikeTrain(st, bin_size=80 * pq.ms)
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot(st.times)
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.plot(bst.bin_centers, bst.to_array().flatten())
+```
+:::
+
+
+:::{#exr-}
+Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **5 ms**. Then plot the spike train `st` together with the binned spike train `bst`.
+:::
+:::{sol.}
+```{python}
+bst = BinnedSpikeTrain(st, bin_size=5 * pq.ms)
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot(st.times)
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.plot(bst.bin_centers, bst.to_array().flatten())
+```
+
+:::{#exr-}
+Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **5 ms**. Then call `bst.binarize()` to make the binned spike train **binary** and plot t together with the spike train `st`.
+o
+:::
+:::{sol.}
+```{python}
+bst = BinnedSpikeTrain(st, bin_size=5 * pq.ms)
+bst = bst.binarize()
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot(st.times)
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.plot(bst.bin_centers, bst.to_array().flatten())
+```
+
+
+:::{#exr-}
+Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **80 ms**. Then call `bst.binarize()` to make the binned spike train **binary** and plot t together with the spike train `st`.
+o
+:::
+:::{sol.}
+```{python}
+bst = BinnedSpikeTrain(st, bin_size=80 * pq.ms)
+bst = bst.binarize()
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot(st.times)
+ax2 = plt.subplot(2, 1, 2, sharex=ax1)
+plt.plot(bst.bin_centers, bst.to_array().flatten())
+```
+
+## Spike Train Covariance and Correlation
+
+| Code | Description |
+| --- | --- |
+| `cov = covariance(bsts)` | Compute the pairwise covariances for the binned spike trains in `bsts` |
+| `r = correlation(bsts)` | Compute the pairwise (Pearson's) correlation for the binned spike trains in `bsts` |
+| `img = plt.imshow(cov)` | Plot the covariance matrix `cov` as an image and assign the returned object to a variable `img` |
+| `plt.colorbar(img)` | Add a colorbar to the image `img` |
+
+---
+
+:::{#exm-}
+Simualte a Poisson neuron with a rate of **1 Hz** that is active for **10 s**. Then. generate **50** spike trains from that neuron and convert them to a binned spke train with a `bin_size` of **5 ms**.
+```{python}
+neuron = StationaryPoissonProcess(rate=1 * pq.Hz, t_stop=10 * pq.s)
+sts = neuron.generate_n_spiketrains(50)
+bsts = BinnedSpikeTrain(sts, bin_size=5 * pq.ms)
+```
+:::
+
+:::{#exm-cov}
+Compute the `covariance` for all pairs of binned spike trains in the list `bsts`. Then, plot the covariance matrix using `plt.imshow()` and add a `plt.colorbar()`.
+```{python}
+cov = covariance(bsts)
+img = plt.imshow(cov)
+plt.colorbar(img)
+```
+:::
+
+:::{#exr-}
+Instead of the pairwise covariances shown in @exm-cov, compute and plot the `correlation_coefficient()` for all pairs of binned spike trains in the list `bsts`. How does the matrix of correlation coefficients differ from the covariance matrix?
+:::
+:::{sol.}
+```{python}
+r = correlation_coefficient(bsts)
+img = plt.imshow(r)
+plt.colorbar(img)
+```
+:::
+
+:::{#exr-corr}
+The code below simulates a brusting neuron, generates **50** spike trains from this neuron and converts them to a `BinnedSpiketrain` with a `bin_size` of **5ms**. Compute and plot the correlation matrix for this neuron.
+```{python}
+neuron = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1 * pq.s,
+    modulation_duration=0.25 * pq.s,
+    modulation_amplitude=20 * pq.Hz,
+    base_rate=1 * pq.Hz,
+    t_stop=3 * pq.s,
+)
+sts = neuron.generate_n_spiketrains(50)
+bsts = BinnedSpikeTrain(sts, bin_size=5 * pq.ms)
+```
+:::
+:::{sol.}
+```{python}
+r = correlation_coefficient(bsts)
+img = plt.imshow(r)
+plt.colorbar(img)
+```
+:::
+
+:::{#exr-}
+How does increasing the `modulation_amplitude` (e.g. to **50 Hz** or **100 Hz**) in @exr-corr affect the correlation of the spike trains?
+:::
+:::{sol.}
+```{python}
+for amp in [50, 100, 150]:
+    neuron = utils.pulse_NonStationaryPoissonProcess(
+        modulation_start=1 * pq.s,
+        modulation_duration=0.25 * pq.s,
+        modulation_amplitude=amp * pq.Hz,
+        base_rate=1 * pq.Hz,
+        t_stop=3 * pq.s,
+    )
+    sts = neuron.generate_n_spiketrains(50)
+    bsts = BinnedSpikeTrain(sts, bin_size=5 * pq.ms)
+    plt.figure()
+    r = correlation_coefficient(bsts)
+    img = plt.imshow(r)
+    plt.colorbar(img)
+```
+:::
+
+:::{#exr-}
+What is the effect of reducing or increasing the `bin_size` for creating the `BinnedSpikeTrain` in @exr-corr
+:::
+:::{sol.}
+```{python}
+for bs in [1, 50]:
+    neuron = utils.pulse_NonStationaryPoissonProcess(
+        modulation_start=1 * pq.s,
+        modulation_duration=0.25 * pq.s,
+        modulation_amplitude=10 * pq.Hz,
+        base_rate=1 * pq.Hz,
+        t_stop=3 * pq.s,
+    )
+    sts = neuron.generate_n_spiketrains(50)
+    bsts = BinnedSpikeTrain(sts, bin_size=bs * pq.ms)
+    plt.figure()
+    r = correlation_coefficient(bsts)
+    img = plt.imshow(r)
+    plt.colorbar(img)
+```
+:::
+
+:::{#exr-corr2}
+The code below simulates two neurons `i` and `j` that have the same parameters except for their `modulation_start`. Run the cell to plot the `.rate_signal` and generate **25** binned spike trains from each neuron. Based on the rate signals, what would you expect the correlation matrix to look like?
+```{python}
+neuron_i = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1 * pq.s,
+    modulation_duration=0.25 * pq.s,
+    modulation_amplitude=50 * pq.Hz,
+    base_rate=1 * pq.Hz,
+    t_stop=3 * pq.s,
+)
+neuron_j = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1.5 * pq.s,
+    modulation_duration=0.25 * pq.s,
+    modulation_amplitude=50 * pq.Hz,
+    base_rate=1 * pq.Hz,
+    t_stop=3 * pq.s,
+)
+plt.plot(neuron_i.rate_signal.times, neuron_i.rate_signal, label="i")
+plt.plot(neuron_j.rate_signal.times, neuron_j.rate_signal, label="j")
+plt.legend()
+plt.xlabel("Time [s]")
+plt.ylabel("Modulation Rate [Hz]")
+sts = neuron_j.generate_n_spiketrains(25) + neuron_i.generate_n_spiketrains(25)
+bsts = BinnedSpikeTrain(sts, bin_size=10 * pq.ms)
+```
+:::
+:::{sol.}
+```{python}
+r = correlation_coefficient(bsts)
+img = plt.imshow(r)
+plt.colorbar(img)
+```
+:::
+
+
+:::{#exr-}
+Increase the `modulation_rate` of `neuron_j` in @exr-corr2 to **200 Hz** and plot the correlation matrix again.
+:::
+:::{sol.}
+```{python}
+neuron_i = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1 * pq.s,
+    modulation_duration=0.25 * pq.s,
+    modulation_amplitude=50 * pq.Hz,
+    base_rate=1 * pq.Hz,
+    t_stop=3 * pq.s,
+)
+neuron_j = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=1.5 * pq.s,
+    modulation_duration=0.25 * pq.s,
+    modulation_amplitude=200 * pq.Hz,
+    base_rate=1 * pq.Hz,
+    t_stop=3 * pq.s,
+)
+sts = neuron_j.generate_n_spiketrains(25) + neuron_i.generate_n_spiketrains(25)
+bsts = BinnedSpikeTrain(sts, bin_size=10 * pq.ms)
+
+r = correlation_coefficient(bsts)
+img = plt.imshow(r)
+plt.colorbar(img)
+```
+:::
+
+## Cross-Correlation Histrogram
+
+| Code | Description |
+| --- | --- |
+| `cc_hist = cross_correlation_histogram(bst_i, bst_j)` | Compute the cross-correlation histogram for two binned spike trains `bst_i` and `bst_j` |
+| `plot_cross_correlation_histogram(cc_hist)` | Plot the cross-correlation histogram `cc_hist` |
+| `kernel = np.hamming(5)` | Create a Hamming window of length `3` |
+| `cc_hist = cross_correlation_histogram(bst_i, bst_j, kernel=kernel)` | Smooth the cross-correlation histogram by applying a `kernel` |
+
+---
+
+:::{#exr-cc}
+The code below computes and plots the `cross_correlation_histogram()` for two binned spike trains from the neurons `i` and `j` that were simulated in @exr-corr2. Try to infer, from the plot, the time lag where the cross-correlation histogram peaks. How is this related to the `modulation_start` of the simulated neurons?
+```{python}
+bst_i = BinnedSpikeTrain(neuron_i.generate_spiketrain(), bin_size=5*pq.ms)
+bst_j = BinnedSpikeTrain(neuron_j.generate_spiketrain(), bin_size=5*pq.ms)
+cc_hist = cross_correlation_histogram(bst_i, bst_j)
+plot_cross_correlation_histogram(cc_hist[0])
+```
+:::
+
+:::{#exr-}
+Repeat the code from @exr-cc but change the order of `bst_i` and `bst_j` when computing the cross-correlation histogram. How did this affect the timing of the cross-correlation?
+:::
+:::{sol.}
+```{python}
+cc_hist = cross_correlation_histogram(bst_i, bst_i)
+plot_cross_correlation_histogram(cc_hist[0])
+```
+:::
+
+:::{#exr-}
+Where would you expect a peak in the cross-correlation histogram of the binned spike trains `i` and `j`, simulated below?
+```{python}
+neuron_i = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=0.4 * pq.s,
+    modulation_duration=0.05 * pq.s,
+    modulation_amplitude=300 * pq.Hz,
+    base_rate=10 * pq.Hz,
+    t_stop=0.5 * pq.s,
+)
+neuron_j = utils.pulse_NonStationaryPoissonProcess(
+    modulation_start=0.3 * pq.s,
+    modulation_duration=0.05 * pq.s,
+    modulation_amplitude=300 * pq.Hz,
+    base_rate=10 * pq.Hz,
+    t_stop=0.5 * pq.s,
+)
+bst_i = BinnedSpikeTrain(neuron_i.generate_spiketrain(), bin_size=5*pq.ms)
+bst_j = BinnedSpikeTrain(neuron_j.generate_spiketrain(), bin_size=5*pq.ms)
+```
+:::
+:::{sol.}
+```{python}
+cc_hist = cross_correlation_histogram(bst_i, bst_j)
+plot_cross_correlation_histogram(cc_hist[0])
+```
+:::
+
+:::{#exr-}
+Create a kernel of length **5** using the `np.hamming()` function, pass it to the `cross_correlation_histogram` function and plot the resulting cross-correlation histogram. Then, increase the size of the kernel to **15** and **30**, respectively. 
+:::
+:::{sol.}
+```{python}
+for n in [5, 15, 30]:
+    kernel = np.hamming(n)
+    cc_hist = cross_correlation_histogram(bst_i, bst_j, kernel=kernel)
+    plt.figure()
+    plot_cross_correlation_histogram(cc_hist[0])
+```
+:::
+
+:::{#exr-}
+Compute and plot the cross-correlation histogram of the spike train `bst` simulated below, **with itself** (i.e. the auti-correlation histogram) and zoom in on the x-axis (e.g. `plt.xlim(-0.1, 0.1)`). Then increase the `refractory_period` (e.g. to **10 ms** or **20 ms**) and repeat the code.
+```{python}
+neuron = StationaryPoissonProcess(
+    rate=30 * pq.Hz, t_stop=10 * pq.s, refractory_period=20 * pq.ms
+)
+st = neuron.generate_spiketrain()
+bst = BinnedSpikeTrain(st, bin_size=1 * pq.ms)
+```
+:::
+:::{sol.}
+```{python}
+cc_hist = cross_correlation_histogram(bst, bst)
+plot_cross_correlation_histogram(cc_hist[0])
+plt.xlim(-0.1, 0.1)
+```
+:::

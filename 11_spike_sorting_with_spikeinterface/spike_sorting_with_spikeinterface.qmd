@@ -4,6 +4,8 @@ engine: Jupyter
 format: html
 filter:
     - assign
+execute: 
+  cache: true
 number-sections: true
 number-depth: 2
 ---

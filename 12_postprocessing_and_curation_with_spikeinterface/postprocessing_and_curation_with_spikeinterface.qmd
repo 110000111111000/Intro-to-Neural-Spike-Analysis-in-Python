@@ -54,6 +54,7 @@ for url, fname in zip(urls, fnames):
 | `analyzer.compute("extension_name")` | Compute an extension for the `analyzer` with a given name |
 | `ext = analyzer.get_extension("extension_name")` | Get an extension from the `analyzer` and assign it to a variable `ext` |
 
+TODO: Referennce all possible extensions (website?)
 ---
 
 :::{#exm-}
@@ -92,7 +93,7 @@ analyzer.compute("random_spikes", method="uniform" max_spikes_per_unit=300)
 :::{#exm-}
 Get the `"random_spikes"` extension from the `analyzer` and print the total number of spikes sampled.
 ```{python}
-ext = analyzer.get_extension("random_s wpikes")
+ext = analyzer.get_extension("random_spikes")
 spike_indices = ext.get_data()
 print("N_spikes = ", len(spike_indices))
 ```

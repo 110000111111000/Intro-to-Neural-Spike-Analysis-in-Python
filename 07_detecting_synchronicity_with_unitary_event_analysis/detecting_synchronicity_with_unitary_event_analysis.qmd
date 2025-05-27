@@ -1,0 +1,344 @@
+```{python}
+import numpy as np
+from matplotlib import pyplot as plt
+import quantities as pq
+from neo.core import Block, Segment, SpikeTrain, AnalogSignal
+import elephant.unitary_event_analysis as ue
+import elephant.conversion as conv
+from elephant.spike_train_generation import StationaryPoissonProcess, NonStationaryPoissonProcess
+from viziphant.unitary_event_analysis import plot_ue
+np.random.seed(15) # Fix random seed to guarantee fixed output
+%matplotlib inline
+```
+
+## Preparation
+
+Download the data required for this session
+```{python}
+import os
+import requests
+import zipfile
+
+url = "https://uni-bonn.sciebo.de/s/FV84Gvj3ZKHPN4Z"
+fname = "allen"
+
+if not os.path.exists("../data"):
+    os.mkdir("../data")
+
+if not os.path.exists(f"../data/{fname}"):
+    response = requests.get(f"{url}/download")
+    with open(f"{fname}.zip", "wb") as file:
+        file.write(response.content)
+
+    with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
+        zip_ref.extractall(f"../data/{fname}")
+        os.remove(f"{fname}.zip")
+```
+
+Define the utility functions for this notebook
+```{python}
+from neo.core import AnalogSignal
+import pandas as pd
+from elephant.spike_train_surrogates import trial_shifting
+
+
+class utils:
+    @staticmethod
+    def spike_trains_with_unitary_events(base_rate, sync_rate, n_neurons, n_trials):
+
+        base = StationaryPoissonProcess(rate=base_rate, t_stop=2 * pq.s)
+
+        rate_signal = np.zeros(2000) * pq.Hz
+        rate_signal[1000:1200] = sync_rate
+        rate_signal = AnalogSignal(rate_signal, sampling_rate=1000 * pq.Hz)
+
+        sync = NonStationaryPoissonProcess(rate_signal)
+        sync_spikes = sync.generate_n_spiketrains(n_trials)
+
+        trials = []
+        for t in range(n_trials):
+            trial = []
+            for n in range(n_neurons):
+                trial.append(base.generate_spiketrain().merge(sync_spikes[t]))
+            trials.append(trial)
+        return trials, sync_spikes
+
+    def load_spike_trains(unit_ids):
+        session = "ses-778240327"
+        spikes = pd.read_parquet(f"../data/allen/{session}/flash_spikes.parquet")
+        stimuli = pd.read_parquet(f"../data/allen/{session}/flash_stimuli.parquet")
+
+        unit_ids = spikes["unit_id"].unique()[unit_ids]
+        print(len(spikes["unit_id"].unique()))
+        spikes = spikes[spikes["unit_id"].isin(unit_ids)]
+
+        trials = []
+        for stim in stimuli["start_time"]:
+            mask = (spikes["spike_time"] >= stim) & (spikes["spike_time"] < stim + 1)
+            trial_spikes = spikes[mask]
+            units = []
+            for unit_id in trial_spikes["unit_id"].unique():
+                unit_spikes = trial_spikes[trial_spikes["unit_id"] == unit_id]
+                brain_area = unit_spikes["brain_area"].iloc[0]
+                spike_times = unit_spikes["spike_time"].to_numpy()
+                st = SpikeTrain(
+                    spike_times * pq.s, t_start=stim, t_stop=stim + 1, name=brain_area
+                )
+                st = st.time_shift(-st.t_start)
+                units.append(st)
+            if len(units) == len(unit_ids):
+                trials.append(units)
+        return trials
+```
+
+## Simulating Neurons with Coincident Firing
+
+| Code | Description |
+| --- | --- |
+|`trials, sync_spikes = utils.spike_trains_with_unitary_events()` | Simulate spike trains that contain synchronous events and return a list of `trials` where each element is a list of spike trains (one per neuron) as well as a list `sync_spikes` that contains the synchronous spikes for every trial |
+| `[trial[0].times for trial in trials]` | Get a list of spike `.times` for neuron `[0]` for each `trial` in the list of `trials` |
+| `[st.times for st in sync_spikes]` | Get a list of spike `.times` for each spike train `st` in the list of `sync_spikes` |
+
+---
+
+:::{#exm-}
+Simulate **2 neurons** for **100 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz**. Then, plot the simulated spike trains and highlight the synchronous spikes in red.
+```{python}
+trials, sync_spikes = utils.spike_trains_with_unitary_events(
+    n_neurons=2, n_trials=100, base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz
+)
+
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot([trial[0].times for trial in trials])
+plt.eventplot(
+    [st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3
+)
+plt.ylabel("Trial #")
+
+ax2 = plt.subplot(2, 1, 2, sharex=ax1, sharey=ax1)
+plt.eventplot([trial[1].times for trial in trials])
+plt.eventplot(
+    [st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3
+)
+plt.xlabel("Time [s]")
+plt.ylabel("Trial #")
+```
+:::
+
+:::{#exr-}
+Simulate **2 neurons** for **100 trials** with a base firing rate of **5 Hz** and a synchronous firing rate of **0.5 Hz**. Then, plot the simulated spike trains and highlight the synchronous spikes in red.
+:::
+:::{sol.}
+```{python}
+trials, sync_spikes = utils.spike_trains_with_unitary_events(
+    base_rate=5 * pq.Hz, sync_rate=0.5 * pq.Hz, n_neurons=2, n_trials=100
+)
+
+ax1 = plt.subplot(2, 1, 1)
+plt.eventplot([trial[0].times for trial in trials])
+plt.eventplot([st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3)
+plt.ylabel("Trial #")
+
+ax2 = plt.subplot(2, 1, 2, sharex=ax1, sharey=ax1)
+plt.eventplot([trial[1].times for trial in trials])
+plt.eventplot([st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3)
+plt.xlabel("Time [s]")
+plt.ylabel("Trial #")
+```
+:::
+
+:::{#exr-}
+Simulate **3 neurons** for **50 trials** with a base firing rate of **5 Hz** and a synchronous firing rate of **0.5 Hz**. Then, plot the simulated spike trains and highlight the synchronous spikes in red.
+:::
+:::{sol.}
+```{python}
+trials, sync_spikes = utils.spike_trains_with_unitary_events(
+    base_rate=5 * pq.Hz, sync_rate=0.5 * pq.Hz, n_neurons=3, n_trials=50
+)
+ax1 = plt.subplot(3, 1, 1)
+plt.eventplot([trial[0].times for trial in trials])
+plt.eventplot(
+    [st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3
+)
+plt.ylabel("Trial #")
+
+ax2 = plt.subplot(3, 1, 2)
+plt.eventplot([trial[1].times for trial in trials])
+plt.eventplot(
+    [st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3
+)
+plt.ylabel("Trial #")
+
+ax3 = plt.subplot(3, 1, 3, sharex=ax1, sharey=ax1)
+plt.eventplot([trial[2].times for trial in trials])
+plt.eventplot(
+    [st.times for st in sync_spikes], color="red", linewidths=3, linelengths=3
+)
+plt.xlabel("Time [s]")
+plt.ylabel("Trial #")
+```
+:::
+
+
+## Applying Unitary Event Analysis to Simulated Data
+
+| Code | Description |
+| --- | --- |
+| `UE = ue.jointJ_window_analysis(trials)` | Perform unitary event analysis on the list of `trials` |
+| `UE = ue.jointJ_window_analysis(trials, bin_size=1*pq.ms)` | Perform unitary event analysis on the list of `trials` using a `bin_size` of 1 ms |
+| `plot_ue(trials, UE, significance_level=0.05)` | Plot the `trials` and the unitary event analysis result `UE` and highlight spikes that exceed the given significance threshold |
+
+---
+
+:::{#exm-}
+Simulate **2 neurons** for **100 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz**. Then, apply unitary event analysis and plot the results.
+```{python}
+trials, _ = utils.spike_trains_with_unitary_events(
+    base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=2, n_trials=100
+)
+UE = ue.jointJ_window_analysis(trials)
+plot_ue(trials, UE, significance_level=0.05)
+```
+:::
+
+:::{#exr-}
+Plot the unitary event analysis results again but increase the `significance_level` to **0.01**.
+:::
+:::{sol.}
+```{python}
+plot_ue(trials, UE, significance_level=0.01)
+```
+:::
+
+:::{#exr-}
+Re-run the unitary event analysis but set the `bin_size` to **1 ms**. How does this affect the number of coincident events (i.e. the blue boxes in panel C) and the number of unitary events (i.e. the red boxes in panel E)?
+:::
+:::{sol.}
+```{python}
+UE = ue.jointJ_window_analysis(trials, bin_size=1 * pq.ms)
+plot_ue(trials, UE, significance_level=0.05)
+```
+The number of coincident events should be greatly reduced, the number of unitary events should stay roughly equal.
+:::
+
+:::{#exr-}
+Simulate **3 neurons** for **50 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz**. Then, apply unitary event analysis and plot the results. How does the number of coincident and unitary events compare to the simulations involving only two neurons?
+:::
+:::{sol.}
+```{python}
+trials, _ = utils.spike_trains_with_unitary_events(
+    base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=3, n_trials=50
+)
+UE = ue.jointJ_window_analysis(trials)
+plot_ue(trials, UE, significance_level=0.05)
+```
+:::
+
+## Scaling Unitary Event Analysis to Large Data Sets
+
+| Code | Description |
+| --- | --- |
+| `ph = ue.hash_from_pattern([0, 1, 1])` | Create a hash that represents a pattern where neuron 1 is inactive and neurons 2 and 3 are active |
+| `UE = ue.jointJ_window_analysis(trials, pattern_hash=ph)` | Use UEA to search for the patterns indicated by the `pattern_hash` |
+
+:::{#exr-}
+The code below simulates **2 neurons** for **100 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz** and adds a third neuron that is purely random. Run unitary event analysis on the simulated `trials` with a `bin_size` of **1 ms** and plot the results. Did you find any unitary events?
+```{python}
+trials, _ = utils.spike_trains_with_unitary_events(
+    base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=2, n_trials=100
+)
+neuron = StationaryPoissonProcess(rate=10 * pq.Hz, t_stop=2 * pq.s)
+for t in range(len(trials)):
+    trials[t].append(neuron.generate_spiketrain())
+```
+:::
+:::{sol.}
+```{python}
+UE = ue.jointJ_window_analysis(trials, bin_size=1*pq.ms)
+plot_ue(trials, UE, significance_level=0.05)
+```
+:::
+
+:::{#exm-}
+Use a `pattern_hash` to only search for patterns in the `trials` where units 1 and 2 are active and unit 3 is not (i.e. the pattern `[1,1,0]`).
+```{python}
+pattern_hash = ue.hash_from_pattern([1, 1, 0])
+UE = ue.jointJ_window_analysis(trials, pattern_hash=pattern_hash)
+plot_ue(trials, UE, significance_level=0.01)
+```
+:::
+
+:::{#exr-}
+The code below simulates **3 neurons** for **50 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz** and inserts two neuron that are purely random at positions 2 and 4. Use unitary event analysis with a `pattern_hash` that only searchers for synchronous activity in neurons 1, 3 and 5 and **ignores neurons 2 and 4**
+```{python}
+trials, _ = utils.spike_trains_with_unitary_events(
+    base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=3, n_trials=50
+)
+neuron = StationaryPoissonProcess(rate=10 * pq.Hz, t_stop=2 * pq.s)
+for t in range(len(trials)):
+    trials[t].insert(1, neuron.generate_spiketrain())
+for t in range(len(trials)):
+    trials[t].insert(3, neuron.generate_spiketrain())
+```
+:::
+:::{sol.}
+```{python}
+pattern_hash = ue.hash_from_pattern([1, 0, 1, 0, 1])
+UE = ue.jointJ_window_analysis(trials, pattern_hash=pattern_hash)
+plot_ue(trials, UE, significance_level=0.01)
+```
+:::
+
+:::{#exr-}
+(Bonus): Assuming that we don't know which exact pattern to look for, we can use UEA to search for all patterns that involve 3 out of the 5 neurons. Apply unitary event analaysis using the list of `pattern_hashes` generated below.
+```{python}
+patterns = [
+    [1, 1, 1, 0, 0],  # neurons 1,2,3 fire
+    [1, 1, 0, 1, 0],  # neurons 1,2,4 fire
+    [1, 1, 0, 0, 1],  # neurons 1,2,5 fire
+    [1, 0, 1, 1, 0],  # neurons 1,3,4 fire
+    [1, 0, 1, 0, 1],  # neurons 1,3,5 fire
+    [1, 0, 0, 1, 1],  # neurons 1,4,5 fire
+    [0, 1, 1, 1, 0],  # neurons 2,3,4 fire
+    [0, 1, 1, 0, 1],  # neurons 2,3,5 fire
+    [0, 1, 0, 1, 1],  # neurons 2,4,5 fire
+    [0, 0, 1, 1, 1],  # neurons 3,4,5 fire
+]
+pattern_hashes = [ue.hash_from_pattern(p) for p in patterns]
+```
+:::
+:::{sol.}
+```{python}
+UE = ue.jointJ_window_analysis(trials, pattern_hash=pattern_hashes)
+```
+:::
+
+Is there a way to plot only one specific pattern hash?
+```{python}
+idx = 4
+x = UE.copy()
+x["input_parameters"]["pattern_hash"] = [x["input_parameters"]["pattern_hash"][idx]]
+x["Js"] = x["Js"][:, idx]
+x["n_emp"] = x["n_emp"][:, idx]
+x["n_exp"] = x["n_exp"][:, idx]
+x["rate_avg"] = x["rate_avg"][:, idx]
+plot_ue(trials, x, significance_level=0.05)
+```
+
+
+## Applying Unitary Event Analysis to Real Data
+
+| Code | Description |
+| --- | --- |
+| `trials = utils.load_spike_trains(unit_ids[1,2])` | Load spike trains from units 1 and 2 and return a list of `trials` where each element is a list containing the spike trains for each unit |
+
+---
+
+:::{#exm-}
+Load the spike trains for units 1 and 2, perform unitary event analysis and plot the results, highlighting the spikes that exceed the significance level of **0.01**.
+```{python}
+trials = utils.load_spike_trains(unit_ids=[1, 2])
+UE = ue.jointJ_window_analysis(trials)
+plot_ue(trials, UE, significance_level=0.01)
+```
+:::

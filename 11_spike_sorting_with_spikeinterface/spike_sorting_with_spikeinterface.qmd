@@ -1,16 +1,16 @@
 ---
 title: "Preprocessing and Spike Sorting with SpikeInterface"
 engine: Jupyter
-format: html
+format: ipynb
 filter:
     - assign
+    - solution
 execute: 
   cache: true
 number-sections: true
 number-depth: 2
 ---
 
-### Import Dependencies
 ```{python}
 import os
 import requests
@@ -23,16 +23,6 @@ from probeinterface.plotting import plot_probe
 
 %matplotlib inline
 ```
-
-### Installing Dependencies and Downloading Data
-
-Install the conda environment from `environment.yml` and select is as the kernel for this notebook.
-
-```bash
-conda env create -f environment.yml
-```
-
-Then, run the cell below to download the data set for this session (this may take a while).
 
 ```{python}
 
@@ -95,11 +85,11 @@ rec.get_duration()
 :::
 
 :::{#exr-}
-Get the sampling frequency of the recording
+Get the sampling frequency of the recording and assign it to a variable `fs`
 :::
 :::{sol.}
 ```{python}
-rec.get_sampling_frequency()
+fs = rec.get_sampling_frequency()
 ```
 :::
 
@@ -275,8 +265,8 @@ ax.set(xlim=(-50, 50), ylim=(-80, 150))
 :::{#exm-}
 Load the `"ASSY-236-H5"` probe from `"cambridgeneurotech"` and remap the channels for the `"cambridgeneurotech_mini-amp-64"` wiring pathway. Then, plot the probe with the contact and device indices and adjust the axis limit to view the tip of the probe.
 ```{python}
-probe = pi.get_probe("cambridgeneurotech", "assy-236-h5")
-probe.wiring_to_device('cambridgeneurotech_mini-amp-64')
+probe = pi.get_probe("cambridgeneurotech", "ASSY-236-H5")
+probe.wiring_to_device("cambridgeneurotech_mini-amp-64")
 
 fig, ax = plt.subplots()
 plot_probe(probe, ax=ax, with_contact_id=True, with_device_index=True)
@@ -359,7 +349,10 @@ t_stop = 30
 fs = rec.get_sampling_frequency()
 seg = rec.frame_slice(start_frame=t_start * fs, end_frame=t_stop * fs)
 sorting_TDC = si.run_sorter(
-    sorter_name="tridesclous2", recording=seg, folder="results_TDC"
+    sorter_name="tridesclous2",
+    recording=seg,
+    folder="results_TDC",
+    remove_existing_folder=True,
 )
 sorting_TDC.get_num_units()
 ```
@@ -461,7 +454,7 @@ sorting_TDC.get_num_units()
 :::
 
 :::{#exr-}
-Run the spike sorter `"tridesclous2"` on the first 30 seconds of the recording `rec` and use the `detection` parameter with the values from @exm-detection and the `filtering` parameter with the values from @exr-exr-filtering. Then, print the number of detected units.
+Run the spike sorter `"tridesclous2"` on the segment `seg`
 :::
 :::{sol.}
 ```{python}

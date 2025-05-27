@@ -1,7 +1,7 @@
 ---
 title: "Correlative Measures on Spike Trains"
 engine: Jupyter
-format: html
+format: ipynb
 filter:
     - assign
 execute: 
@@ -31,7 +31,8 @@ from viziphant.spike_train_correlation import (
 ```{python}
 from neo.core import AnalogSignal
 
-    @staticmethod
+
+class utils:
     def pulse_NonStationaryPoissonProcess(
         modulation_start,
         modulation_duration,
@@ -197,7 +198,6 @@ plt.plot(bst.bin_centers, bst.to_array().flatten())
 ```
 :::
 
-
 :::{#exr-}
 Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **5 ms**. Then plot the spike train `st` together with the binned spike train `bst`.
 :::
@@ -209,6 +209,7 @@ plt.eventplot(st.times)
 ax2 = plt.subplot(2, 1, 2, sharex=ax1)
 plt.plot(bst.bin_centers, bst.to_array().flatten())
 ```
+:::
 
 :::{#exr-}
 Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **5 ms**. Then call `bst.binarize()` to make the binned spike train **binary** and plot t together with the spike train `st`.
@@ -223,7 +224,7 @@ plt.eventplot(st.times)
 ax2 = plt.subplot(2, 1, 2, sharex=ax1)
 plt.plot(bst.bin_centers, bst.to_array().flatten())
 ```
-
+:::
 
 :::{#exr-}
 Create a `BinnedSpikeTrain` from the spike train `st` with a `bin_size` of **80 ms**. Then call `bst.binarize()` to make the binned spike train **binary** and plot t together with the spike train `st`.
@@ -238,6 +239,7 @@ plt.eventplot(st.times)
 ax2 = plt.subplot(2, 1, 2, sharex=ax1)
 plt.plot(bst.bin_centers, bst.to_array().flatten())
 ```
+:::
 
 ## Spike Train Covariance and Correlation
 

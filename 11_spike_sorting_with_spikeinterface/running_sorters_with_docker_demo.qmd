@@ -1,9 +1,7 @@
 ---
 title: "Running Sorters with Docker (Demo)"
 engine: Jupyter
-format: html
-filter:
-    - assign
+format: ipynb
 execute: 
   cache: true
 number-sections: true

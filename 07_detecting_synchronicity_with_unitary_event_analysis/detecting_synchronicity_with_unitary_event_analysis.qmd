@@ -1,9 +1,10 @@
 ---
 title: "Deceting Synchronicity with Unitary Event Analysis (UEA)"
 engine: Jupyter
-format: html
+format: ipynb
 filter:
     - assign
+    - solution
 execute: 
   cache: true
 number-sections: true

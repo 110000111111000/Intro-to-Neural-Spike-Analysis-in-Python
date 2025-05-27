@@ -1,9 +1,10 @@
 ---
 title: "Mining Statistical Patterns with SPADE"
 engine: Jupyter
-format: html
+format: ipynb
 filter:
     - assign
+    - solution
 execute: 
   cache: true
 number-sections: true

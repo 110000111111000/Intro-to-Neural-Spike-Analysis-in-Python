@@ -1,9 +1,10 @@
 ---
 title: "Postprocessing and Curation with SpikeInterface"
 engine: Jupyter
-format: html
+format: ipynb
 filter:
     - assign
+    - solution
 execute: 
   cache: true
 number-sections: true
@@ -88,7 +89,7 @@ analyzer = si.create_sorting_analyzer(sort, rec)
 :::{#exm-}
 Randomly sample up to `300` spikes from every unit.
 ```{python}
-analyzer.compute("random_spikes", method="uniform" max_spikes_per_unit=300)
+analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=300)
 ```
 :::
 

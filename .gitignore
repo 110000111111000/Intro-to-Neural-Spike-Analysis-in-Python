@@ -10,3 +10,4 @@
 # pixi environments
 .pixi
 *.egg-info
+*/.jupyter_cache

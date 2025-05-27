@@ -1,9 +1,10 @@
 ---
 title: "Simulating Neurons as Poisson Processes"
 engine: Jupyter
-format: html
+format: ipynb
 filter:
     - assign
+    - solution
 execute: 
   cache: true
 number-sections: true
@@ -12,6 +13,7 @@ number-depth: 2
 
 ```{python}
 import quantities as pq
+import numpy as np
 from matplotlib import pyplot as plt
 from neo.core import AnalogSignal
 from elephant.spike_train_generation import StationaryPoissonProcess
@@ -299,7 +301,7 @@ Generate **50** spike trains from the neuron simuated in @exr-sim1 and plot a hi
 
 and visualize the normalized density of the observed spike counts. Then, generate **1000** spike trains from the same neuron and visualize the normalized density of the observed spike counts in the same plot (HINT: in the `plt.bar()` function, set `alpha=0.5` to make the bars transparent).
 :::
-:::
+:::{sol.}
 ```{python}
 sts = neuron.generate_n_spiketrains(50)
 n_spikes = [len(st) for st in sts]
@@ -312,6 +314,7 @@ plt.hist(n_spikes, density=True, alpha=0.5)
 plt.xlabel("Spike Count")
 plt.ylabel("Count")
 ```
+:::
 
 :::{#exm-}
 Plot the theoretical Poisson distribution for observing between **0 and 5** spikes in a neuron with a `rate` of **0.5 Hz** that is active for **3 s**.

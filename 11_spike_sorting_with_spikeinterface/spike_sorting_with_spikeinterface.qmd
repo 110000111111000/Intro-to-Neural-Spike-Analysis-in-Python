@@ -4,7 +4,6 @@ engine: Jupyter
 format: ipynb
 filter:
     - assign
-    - solution
 execute: 
   cache: true
 number-sections: true

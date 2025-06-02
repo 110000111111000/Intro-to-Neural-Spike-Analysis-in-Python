@@ -181,7 +181,7 @@ t = stimuli.loc[10, "start_time"]
 spike_is_after_t = unit["spike_time"] > t + 0.1
 spike_is_before_tplus = unit["spike_time"] < t + 0.5
 spike_is_within_window = spike_is_after_t & spike_is_before_tplus
-sum(spike_is_within_window) / 0.4
+sum(spike_is_in_window) / 0.4
 ```
 :::
 
@@ -244,26 +244,26 @@ Combine the masks from @exr-after2d and @exr-before2d to create a mask that is `
 :::
 :::{sol.}
 ```{python}
-spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+spike_is_in_window = spike_is_after_t & spike_is_before_tplus
 ```
 :::
 
 :::{#exr-}
-Use the `.any()` method on the mask from @exr-mask2d to get a 1D mask that is `True` if a spike falls within a **0.5 s** interval after any stimulus. Then, use that mask to filter th `spikes` data frame and assign the filtered data frame to a new variable `spikes_within_window`. Print the `len()` of this new data frame to get the total number of spikes that fall within a **0.5 s** interval after any stimulus.
+Use the `.any()` method on the mask from @exr-mask2d to get a 1D mask that is `True` if a spike falls within a **0.5 s** interval after any stimulus. Then, use that mask to filter th `spikes` data frame and assign the filtered data frame to a new variable `spikes_in_window`. Print the `len()` of this new data frame to get the total number of spikes that fall within a **0.5 s** interval after any stimulus.
 :::
 :::{sol.}
 ```{python}
-mask = spike_is_within_window.any(axis=1)
-spikes_within_window = spikes[mask]
-len(spikes_within_window)
+mask = spike_is_in_window.any(axis=1)
+spikes_in_window = spikes[mask]
+len(spikes_in_window)
 ```
 :::
 
 :::{#exr-fr}
-From the data frame of the `spikes_within_window`, get the number of spikes produced by unit `951016662`. Then, divide this count by the length of the time window (i.e. **0.5 s**) times the number of stimuli to get the firing rate of the unit across all stimuli.
+From the data frame of the `spikes_in_window`, get the number of spikes produced by unit `951016662`. Then, divide this count by the length of the time window (i.e. **0.5 s**) times the number of stimuli to get the firing rate of the unit across all stimuli.
 
 ```{python}
-spike_count = len(spikes_within_window[spikes_within_window["unit_id"] == 951016662])
+spike_count = len(spikes_in_window[spikes_in_window["unit_id"] == 951016662])
 spike_count / (0.5 * len(stimuli))
 ```
 :::
@@ -272,45 +272,45 @@ spike_count / (0.5 * len(stimuli))
 Complete the function below that selects all spikes that fall between `tmin` and `tmax` after any stimuli by computing `spike_is_before_tplus` and `mask`.
 ```{python}
 #| eval: false
-def find_spikes_within_window(spikes, stimuli, tmin, tmax):
+def find_spikes_in_window(spikes, stimuli, tmin, tmax):
     t = stimuli["start_time"].to_numpy()
     spike_time = spikes["spike_time"].to_numpy()
 
     spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :] + tmin
     spike_is_before_tplus =
-    spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+    spike_is_in_window = spike_is_after_t & spike_is_before_tplus
 
     mask =
-    spikes_within_window = spikes[mask]
+    spikes_in_window = spikes[mask]
 
-    return spikes_within_window
+    return spikes_in_window
 ```
 :::
 :::{sol.}
 ```{python}
-def find_spikes_within_window(spikes, stimuli, tmin, tmax):
+def find_spikes_in_window(spikes, stimuli, tmin, tmax):
     t = stimuli["start_time"].to_numpy()
     spike_time = spikes["spike_time"].to_numpy()
 
     spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :] + tmin
     spike_is_before_tplus = spike_time[:, np.newaxis] < t[np.newaxis, :] + tmax
-    spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+    spike_is_in_window = spike_is_after_t & spike_is_before_tplus
 
-    mask = spike_is_within_window.any(axis=1)
-    spikes_within_window = spikes[mask]
+    mask = spike_is_in_window.any(axis=1)
+    spikes_in_window = spikes[mask]
 
-    return spikes_within_window
+    return spikes_in_window
 ```
 :::
 
 :::{#exm-}
-Use the newly defined function `find_spikes_within_window` to filter all spikes that happen between `tmin=0` and `tmax=0.5` seconds after any stimuli. Then, compute the firing rate of unit `951016662`. The result should be the same as in @exr-fr.
+Use the newly defined function `find_spikes_in_window` to filter all spikes that happen between `tmin=0` and `tmax=0.5` seconds after any stimuli. Then, compute the firing rate of unit `951016662`. The result should be the same as in @exr-fr.
 ```{python}
 tmin = 0
 tmax = 0.5
-spikes_within_window = find_spikes_within_window(spikes, stimuli, tmin, tmax)
+spikes_in_window = find_spikes_in_window(spikes, stimuli, tmin, tmax)
 
-spike_count = len(spikes_within_window[spikes_within_window["unit_id"] == 951016662])
+spike_count = len(spikes_in_window[spikes_in_window["unit_id"] == 951016662])
 spike_count / ((tmax - tmin) * len(stimuli))
 ```
 :::
@@ -327,13 +327,13 @@ n_units_v1 = len(spikes_v1["unit_id"].unique())
 :::
 
 :::{#exr-}
-Use `find_spikes_within_window()` to filter all spikes in `spikes_v1` that occurr between **0.02 and 0.06 s** after any stimulus.
+Use `find_spikes_in_window()` to filter all spikes in `spikes_v1` that occurr between **0.02 and 0.06 s** after any stimulus.
 :::
 :::{sol.}
 ```{python}
 tmin = 0.02
 tmax = 0.06
-spikes_v1_within_window = find_spikes_within_window(spikes_v1, stimuli, tmin, tmax)
+spikes_v1_in_window = find_spikes_in_window(spikes_v1, stimuli, tmin, tmax)
 ```
 :::
 
@@ -342,7 +342,7 @@ Compute the population firing rate for `"V1"` between **0.02 and 0.06 s** after 
 :::
 :::{sol.}
 ```{python}
-len(spikes_v1_within_window)/n_units_v1/(len(stimuli)*(tmax-tmin))
+len(spikes_v1_in_window)/n_units_v1/(len(stimuli)*(tmax-tmin))
 ```
 :::
 
@@ -353,8 +353,8 @@ Compute the population firing rate for the anterolateral area `"AL"` between **0
 ```{python}
 spikes_al = spikes[spikes["brain_area"] == "AL"]
 n_units_al = len(spikes_v1["unit_id"].unique())
-spikes_al_within_window = find_spikes_within_window(spikes_al, stimuli, tmin, tmax)
-len(spikes_al_within_window)/n_units_al/(len(stimuli)*(tmax-tmin))
+spikes_al_in_window = find_spikes_in_window(spikes_al, stimuli, tmin, tmax)
+len(spikes_al_in_window)/n_units_al/(len(stimuli)*(tmax-tmin))
 ```
 :::
 
@@ -365,10 +365,10 @@ Compare the population firing rates of `"V1"` and `"AL"` between **0.04 and 0.1 
 ```{python}
 tmin = 0.04
 tmax = 0.1
-spikes_v1_within_window = find_spikes_within_window(spikes_v1, stimuli, tmin, tmax)
-print(len(spikes_v1_within_window) / n_units_v1 / (len(stimuli) * (tmax - tmin)))
+spikes_v1_in_window = find_spikes_in_window(spikes_v1, stimuli, tmin, tmax)
+print(len(spikes_v1_in_window) / n_units_v1 / (len(stimuli) * (tmax - tmin)))
 
-spikes_al_within_window = find_spikes_within_window(spikes_al, stimuli, tmin, tmax)
-print(len(spikes_al_within_window) / n_units_al / (len(stimuli) * (tmax - tmin)))
+spikes_al_in_window = find_spikes_in_window(spikes_al, stimuli, tmin, tmax)
+print(len(spikes_al_in_window) / n_units_al / (len(stimuli) * (tmax - tmin)))
 ```
 :::

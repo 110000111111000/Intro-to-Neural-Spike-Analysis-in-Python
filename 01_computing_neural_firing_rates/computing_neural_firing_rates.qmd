@@ -1,0 +1,374 @@
+---
+title: "Computing Neural Firing Rates"
+engine: Jupyter
+format: ipynb
+filter:
+    - assign
+execute: 
+  cache: true
+number-sections: true
+number-depth: 2
+---
+
+## Preparation
+
+Download the data
+```{python}
+import os
+import requests
+import zipfile
+
+url = "https://uni-bonn.sciebo.de/s/FV84Gvj3ZKHPN4Z"
+fname = "allen"
+
+if not os.path.exists("../data"):
+    os.mkdir("../data")
+
+if not os.path.exists(f"../data/{fname}"):
+    response = requests.get(f"{url}/download")
+    with open(f"{fname}.zip", "wb") as file:
+        file.write(response.content)
+
+    with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
+        zip_ref.extractall(f"../data/{fname}")
+        os.remove(f"{fname}.zip")
+```
+
+## Computing the Firing Rate of a Neuron
+
+| Code | Description |
+| --- | --- |
+| `df = pd.read_parquet("mydata.parquet")` | Read the file `"mydata.parquet"` into a data frame `df` |
+| `df.head(n)` | Print the first `n` lines of the data frame `df` |
+| `df["col1"]` | Access the column `"col1"` of the data frame `df` |
+| `df["col1"].unique()` | Get the `.unique()` values stored in the column `"col1"` |
+| `mask = df["col1"]==1` | Create a `mask` that is `True` for every row where `"col1"` contains the value `1` |
+| `df[mask]` | Use the `mask` to filter the data frame `df` and get all rows where the `mask` is `True` |
+
+---
+
+
+:::{#exr-}
+Load the data stored in `"../data/flash_spikes.parquet"` into a data frame and assign it to a variable `spikes`, then print the first 5 rows.
+:::
+:::{sol.}
+```{python}
+session = "ses-778240327"
+spikes = pd.read_parquet(f"../data/allen/{session}/flash_spikes.parquet")
+spikes.head(5)
+```
+:::
+
+:::{#exr-}
+How many unique units does this data set contain?
+:::
+:::{sol.}
+```{python}
+len(spikes["unit_id"].unique())
+```
+:::
+
+:::{#exr-count}
+Find all rows where `spikes["unit_id"]==951035458` and compute the length of the filtered data frame to get the number of spikes produced by unit `951035458`.
+:::
+:::{sol.}
+```{python}
+count = len(spikes[spikes["unit_id"]==951035458])
+```
+:::
+
+:::{#exr-dur}
+Get the duration of the recording by computing the difference between the first and last `"spike_time"`.
+:::
+:::{sol.}
+```{python}
+dur = spikes["spike_time"].max() - spikes["spike_time"].min()
+```
+:::
+
+:::{#exr-}
+Divide the number of spikes computed in @exr-count by the recording duration computed in @exr-dur to get the firing rate for unit `951035458`
+:::
+:::{sol.}
+```{python}
+count/dur
+```
+:::
+
+:::{#exr-}
+Compute the firing rate for unit `951026717`.
+:::
+:::{sol.}
+```{python}
+len(spikes[spikes["unit_id"] == 951026717]) / dur
+```
+:::
+
+## Computing the Firing Rate Within a Given Time Window
+
+| Code | Description |
+| --- | --- |
+| `df.loc[5, "col1"]` | Get the value in column `"col1"` at index `5` |
+| `mask1 = df["col1"]>1` | Create a mask that is `True` for all rows where `"col1"` is greater than `1` |
+| `mask2 = df["col1"]<3` | Create a mask that is `True` for all rows where `"col1"` is smaller than `3` |
+| `mask = mask1 & mask2` | Create a mask that is `True` where both `mask1` AND `mask2` are `True` |
+| `sum(mask)` | Sum all values in `mask` which is equivalent to the number of elements that are `True` |
+
+---
+
+:::{#exr-}
+Load the data stored in `"../data/flash_stimuli.parquet"` into a data frame and assign it to a variable `stimuli`, then print the first 5 rows.
+:::
+:::{sol.}
+```{python}
+session = "ses-778240327"
+stimuli = pd.read_parquet(f"../data/allen/{session}/flash_stimuli.parquet")
+spikes.head(5)
+```
+:::
+
+:::{#exr-after}
+The code below defines the variable `unit` with the spikes produced by unti `951026717` the variable `t` with the `"start_time"` of the first stimulus. Define a mask that filters all spikes in `unit` that happen **after** `t`.
+```{python}
+unit = spikes[spikes["unit_id"] == 951026717]
+t = stimuli.loc[0, "start_time"]
+```
+:::
+:::{sol.}
+```{python}
+spike_is_after_t = unit["spike_time"] > t
+```
+:::
+
+:::{#exr-before}
+Define another mask that filters all spikes in `unit` that happen **before** the time point `t+0.5`.
+```{python}
+spike_is_before_tplus = unit["spike_time"] < t + 0.5
+```
+:::
+
+:::{#exr-}
+Combine the masks from @exr-after and @exr-before using the `&` operator to create a mask that filters the spikes that happen within the time window between `t` and `t+0.5`. `sum()` this mask to get the number of spikes within the window and divide it by the length of the window to get the firing rate.
+:::
+:::{sol.}
+```{python}
+spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+sum(spike_is_within_window) / 0.5
+```
+:::
+
+:::{#exr-}
+Get the firing rate of the same unit within **0.5 s** after the **10th** stimulus
+:::
+:::{sol.}
+```{python}
+unit = spikes[spikes["unit_id"] == 951026717]
+t = stimuli.loc[10, "start_time"]
+spike_is_after_t = unit["spike_time"] > t
+spike_is_before_tplus = unit["spike_time"] < t + 0.5
+spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+sum(spike_is_within_window) / 0.5
+```
+:::
+
+:::{#exr-}
+Get the firing rate of unit `951016662` **between 0.1 and 0.5 s** after the **10th** stimulus.
+:::
+:::{sol.}
+```{python}
+unit = spikes[spikes["unit_id"] == 951016662]
+t = stimuli.loc[10, "start_time"]
+spike_is_after_t = unit["spike_time"] > t + 0.1
+spike_is_before_tplus = unit["spike_time"] < t + 0.5
+spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+sum(spike_is_within_window) / 0.4
+```
+:::
+
+## Computing Firing Rates Across Stimuli and Units with Array Broadcasting
+
+| Code | Description |
+| --- | --- |
+| `x = df.["col1"].to_numpy()` | Export the data stored in `"col1"` as a numpy array and assign it to a variable `x` |
+| `x[:, np.newaxis]` | Add a new (empty) dimension as the second dimension of the array `x` |
+| `x[np.newaxis,:]` | Add a new (empty) dimension as the first dimension of the array `x` |
+| `x.any()` | Retruns `True` if `.any()` element of `x` is `True` |
+| `x.any(axis=1)` | Returns `True` for every row of `x` if `.any()` column is `True` |
+
+---
+
+:::{#exr-}
+Export `stimuli["start_time"]` as a numypy array and assign it to avariable `t`. Then, print its `.shape`.
+:::
+:::{sol.}
+```{python}
+t = stimuli["start_time"].to_numpy()
+t.shape
+```
+:::
+
+:::{#exr-}
+Export `spikes["spike_time"]` as a numypy array and assign it to avariable `spike_time`. Then, print its `.shape`.
+:::
+:::{sol.}
+```{python}
+spike_time = spikes["spike_time"].to_numpy()
+spike_time.shape
+```
+:::
+
+
+:::{#exr-after2d}
+The cell below creates a mask that is `True` if a spike happens **after** stimulus onset for every spike in `spike_time` and every stimulus in `t`. What is the .shape of `spike_is_after_t`?
+```{python}
+spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :]
+```
+:::
+:::{sol.}
+```{python}
+spike_is_after_t.shape
+```
+:::
+
+:::{#exr-before2d}
+The cell below creates a mask that is `True` if a spike happens **before** stimulus onset plus **0.5 s** for every spike in `spike_time` and every stimulus in `t`. What is the .shape of `spike_is_after_t`?
+:::
+:::{sol.}
+```{python}
+spike_is_before_tplus = spike_time[:, np.newaxis] < t[np.newaxis, :] + 0.5
+```
+:::
+
+:::{#exr-mask2d}
+Combine the masks from @exr-after2d and @exr-before2d to create a mask that is `True` if a spike occurrs within **0.5 s** after stimulus onset for every spike in `spike_time` and every stimulus in `t`.
+:::
+:::{sol.}
+```{python}
+spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+```
+:::
+
+:::{#exr-}
+Use the `.any()` method on the mask from @exr-mask2d to get a 1D mask that is `True` if a spike falls within a **0.5 s** interval after any stimulus. Then, use that mask to filter th `spikes` data frame and assign the filtered data frame to a new variable `spikes_within_window`. Print the `len()` of this new data frame to get the total number of spikes that fall within a **0.5 s** interval after any stimulus.
+:::
+:::{sol.}
+```{python}
+mask = spike_is_within_window.any(axis=1)
+spikes_within_window = spikes[mask]
+len(spikes_within_window)
+```
+:::
+
+:::{#exr-fr}
+From the data frame of the `spikes_within_window`, get the number of spikes produced by unit `951016662`. Then, divide this count by the length of the time window (i.e. **0.5 s**) times the number of stimuli to get the firing rate of the unit across all stimuli.
+
+```{python}
+spike_count = len(spikes_within_window[spikes_within_window["unit_id"] == 951016662])
+spike_count / (0.5 * len(stimuli))
+```
+:::
+
+:::{#exr-}
+Complete the function below that selects all spikes that fall between `tmin` and `tmax` after any stimuli by computing `spike_is_before_tplus` and `mask`.
+```{python}
+#| eval: false
+def find_spikes_within_window(spikes, stimuli, tmin, tmax):
+    t = stimuli["start_time"].to_numpy()
+    spike_time = spikes["spike_time"].to_numpy()
+
+    spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :] + tmin
+    spike_is_before_tplus =
+    spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+
+    mask =
+    spikes_within_window = spikes[mask]
+
+    return spikes_within_window
+```
+:::
+:::{sol.}
+```{python}
+def find_spikes_within_window(spikes, stimuli, tmin, tmax):
+    t = stimuli["start_time"].to_numpy()
+    spike_time = spikes["spike_time"].to_numpy()
+
+    spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :] + tmin
+    spike_is_before_tplus = spike_time[:, np.newaxis] < t[np.newaxis, :] + tmax
+    spike_is_within_window = spike_is_after_t & spike_is_before_tplus
+
+    mask = spike_is_within_window.any(axis=1)
+    spikes_within_window = spikes[mask]
+
+    return spikes_within_window
+```
+:::
+
+:::{#exm-}
+Use the newly defined function `find_spikes_within_window` to filter all spikes that happen between `tmin=0` and `tmax=0.5` seconds after any stimuli. Then, compute the firing rate of unit `951016662`. The result should be the same as in @exr-fr.
+```{python}
+tmin = 0
+tmax = 0.5
+spikes_within_window = find_spikes_within_window(spikes, stimuli, tmin, tmax)
+
+spike_count = len(spikes_within_window[spikes_within_window["unit_id"] == 951016662])
+spike_count / ((tmax - tmin) * len(stimuli))
+```
+:::
+
+
+## Population Firing Rates
+
+:::{#exm-}
+Filter the spikes recorded from primary visual cortex `"V1"` and get the total number of units recorded in `"V1"`.
+```{python}
+spikes_v1 = spikes[spikes["brain_area"] == "V1"]
+n_units_v1 = len(spikes_v1["unit_id"].unique())
+```
+:::
+
+:::{#exr-}
+Use `find_spikes_within_window()` to filter all spikes in `spikes_v1` that occurr between **0.02 and 0.06 s** after any stimulus.
+:::
+:::{sol.}
+```{python}
+tmin = 0.02
+tmax = 0.06
+spikes_v1_within_window = find_spikes_within_window(spikes_v1, stimuli, tmin, tmax)
+```
+:::
+
+:::{#exr-}
+Compute the population firing rate for `"V1"` between **0.02 and 0.06 s** after stimulus onset by taking the total number of spikes and dividing it by the number of units `n_units_v1` and the duration of the time window times the number of stimuli.
+:::
+:::{sol.}
+```{python}
+len(spikes_v1_within_window)/n_units_v1/(len(stimuli)*(tmax-tmin))
+```
+:::
+
+:::{#exr-}
+Compute the population firing rate for the anterolateral area `"AL"` between **0.02 and 0.06 s** after stimulus onset. Is it lower or higher than the population firing rate of V1?
+:::
+:::{sol.}
+```{python}
+spikes_al = spikes[spikes["brain_area"] == "AL"]
+n_units_al = len(spikes_v1["unit_id"].unique())
+spikes_al_within_window = find_spikes_within_window(spikes_al, stimuli, tmin, tmax)
+len(spikes_al_within_window)/n_units_al/(len(stimuli)*(tmax-tmin))
+```
+:::
+
+:::{#exr-}
+Compare the population firing rates of `"V1"` and `"AL"` between **0.04 and 0.1 s** after stimulus onset. Which one is higher in this time interval?
+:::
+:::{sol.}
+```{python}
+tmin = 0.04
+tmax = 0.1
+spikes_v1_within_window = find_spikes_within_window(spikes_v1, stimuli, tmin, tmax)
+print(len(spikes_v1_within_window) / n_units_v1 / (len(stimuli) * (tmax - tmin)))
+
+spikes_al_within_window = find_spikes_within_window(spikes_al, stimuli, tmin, tmax)
+print(len(spikes_al_within_window) / n_units_al / (len(stimuli) * (tmax - tmin)))
+```
+:::

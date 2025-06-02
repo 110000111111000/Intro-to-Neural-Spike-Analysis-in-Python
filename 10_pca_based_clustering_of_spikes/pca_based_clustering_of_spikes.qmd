@@ -521,7 +521,7 @@ plt.legend()
 :::
 
 :::{#exr-}
-Recrete the graph from the previous exercise but plot the amplitude at **channel 1** against the amplitude at the **channel 3**. Which of the clusters likely represents a distinct unit?
+Recreate the graph from the previous exercise but plot the amplitude at **channel 1** against the amplitude at the **channel 3**. Which of the clusters likely represents a distinct unit?
 :::
 :::{sol.}
 ```{python}

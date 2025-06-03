@@ -2,7 +2,7 @@
 title: "Deceting Synchronicity with Unitary Event Analysis (UEA)"
 engine: Jupyter
 format: ipynb
-filter:
+filters:
     - assign
 execute: 
   cache: true
@@ -81,7 +81,6 @@ class utils:
         stimuli = pd.read_parquet(f"../data/allen/{session}/flash_stimuli.parquet")
 
         unit_ids = spikes["unit_id"].unique()[unit_ids]
-        print(len(spikes["unit_id"].unique()))
         spikes = spikes[spikes["unit_id"].isin(unit_ids)]
 
         trials = []
@@ -115,6 +114,8 @@ class utils:
 
 :::{#exm-}
 Simulate **2 neurons** for **100 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz**. Then, plot the simulated spike trains and highlight the synchronous spikes in red.
+:::
+
 ```{python}
 trials, sync_spikes = utils.spike_trains_with_unitary_events(
     n_neurons=2, n_trials=100, base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz
@@ -135,12 +136,13 @@ plt.eventplot(
 plt.xlabel("Time [s]")
 plt.ylabel("Trial #")
 ```
-:::
 
 :::{#exr-}
 Simulate **2 neurons** for **100 trials** with a base firing rate of **5 Hz** and a synchronous firing rate of **0.5 Hz**. Then, plot the simulated spike trains and highlight the synchronous spikes in red.
 :::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 trials, sync_spikes = utils.spike_trains_with_unitary_events(
     base_rate=5 * pq.Hz, sync_rate=0.5 * pq.Hz, n_neurons=2, n_trials=100
@@ -157,12 +159,15 @@ plt.eventplot([st.times for st in sync_spikes], color="red", linewidths=3, linel
 plt.xlabel("Time [s]")
 plt.ylabel("Trial #")
 ```
+
 :::
 
 :::{#exr-}
 Simulate **3 neurons** for **50 trials** with a base firing rate of **5 Hz** and a synchronous firing rate of **0.5 Hz**. Then, plot the simulated spike trains and highlight the synchronous spikes in red.
 :::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 trials, sync_spikes = utils.spike_trains_with_unitary_events(
     base_rate=5 * pq.Hz, sync_rate=0.5 * pq.Hz, n_neurons=3, n_trials=50
@@ -189,10 +194,15 @@ plt.eventplot(
 plt.xlabel("Time [s]")
 plt.ylabel("Trial #")
 ```
+
 :::
 
 
 ## Applying Unitary Event Analysis to Simulated Data
+
+ TODO: 
+  - vary winsize parameter, relationship between winsize and number of trials
+  - reduce numer of trials to make analysis run faster?
 
 | Code | Description |
 | --- | --- |
@@ -204,6 +214,8 @@ plt.ylabel("Trial #")
 
 :::{#exm-}
 Simulate **2 neurons** for **100 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz**. Then, apply unitary event analysis and plot the results.
+:::
+
 ```{python}
 trials, _ = utils.spike_trains_with_unitary_events(
     base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=2, n_trials=100
@@ -211,32 +223,38 @@ trials, _ = utils.spike_trains_with_unitary_events(
 UE = ue.jointJ_window_analysis(trials)
 plot_ue(trials, UE, significance_level=0.05)
 ```
-:::
 
 :::{#exr-}
 Plot the unitary event analysis results again but increase the `significance_level` to **0.01**.
 :::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 plot_ue(trials, UE, significance_level=0.01)
 ```
+
 :::
 
 :::{#exr-}
 Re-run the unitary event analysis but set the `bin_size` to **1 ms**. How does this affect the number of coincident events (i.e. the blue boxes in panel C) and the number of unitary events (i.e. the red boxes in panel E)?
 :::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 UE = ue.jointJ_window_analysis(trials, bin_size=1 * pq.ms)
 plot_ue(trials, UE, significance_level=0.05)
 ```
-The number of coincident events should be greatly reduced, the number of unitary events should stay roughly equal.
+
 :::
 
 :::{#exr-}
 Simulate **3 neurons** for **50 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz**. Then, apply unitary event analysis and plot the results. How does the number of coincident and unitary events compare to the simulations involving only two neurons?
 :::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 trials, _ = utils.spike_trains_with_unitary_events(
     base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=3, n_trials=50
@@ -244,6 +262,7 @@ trials, _ = utils.spike_trains_with_unitary_events(
 UE = ue.jointJ_window_analysis(trials)
 plot_ue(trials, UE, significance_level=0.05)
 ```
+
 :::
 
 ## Scaling Unitary Event Analysis to Large Data Sets
@@ -253,8 +272,12 @@ plot_ue(trials, UE, significance_level=0.05)
 | `ph = ue.hash_from_pattern([0, 1, 1])` | Create a hash that represents a pattern where neuron 1 is inactive and neurons 2 and 3 are active |
 | `UE = ue.jointJ_window_analysis(trials, pattern_hash=ph)` | Use UEA to search for the patterns indicated by the `pattern_hash` |
 
+---
+
 :::{#exr-}
 The code below simulates **2 neurons** for **100 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz** and adds a third neuron that is purely random. Run unitary event analysis on the simulated `trials` with a `bin_size` of **1 ms** and plot the results. Did you find any unitary events?
+:::
+
 ```{python}
 trials, _ = utils.spike_trains_with_unitary_events(
     base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=2, n_trials=100
@@ -263,25 +286,30 @@ neuron = StationaryPoissonProcess(rate=10 * pq.Hz, t_stop=2 * pq.s)
 for t in range(len(trials)):
     trials[t].append(neuron.generate_spiketrain())
 ```
-:::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 UE = ue.jointJ_window_analysis(trials, bin_size=1*pq.ms)
 plot_ue(trials, UE, significance_level=0.05)
 ```
+
 :::
 
 :::{#exm-}
 Use a `pattern_hash` to only search for patterns in the `trials` where units 1 and 2 are active and unit 3 is not (i.e. the pattern `[1,1,0]`).
+:::
+
 ```{python}
 pattern_hash = ue.hash_from_pattern([1, 1, 0])
 UE = ue.jointJ_window_analysis(trials, pattern_hash=pattern_hash)
 plot_ue(trials, UE, significance_level=0.01)
 ```
-:::
 
 :::{#exr-}
 The code below simulates **3 neurons** for **50 trials** with a base firing rate of **10 Hz** and a synchronous firing rate of **1 Hz** and inserts two neuron that are purely random at positions 2 and 4. Use unitary event analysis with a `pattern_hash` that only searchers for synchronous activity in neurons 1, 3 and 5 and **ignores neurons 2 and 4**
+:::
+
 ```{python}
 trials, _ = utils.spike_trains_with_unitary_events(
     base_rate=10 * pq.Hz, sync_rate=1 * pq.Hz, n_neurons=3, n_trials=50
@@ -292,50 +320,16 @@ for t in range(len(trials)):
 for t in range(len(trials)):
     trials[t].insert(3, neuron.generate_spiketrain())
 ```
-:::
-:::{sol.}
+
+:::{.sol}
+
 ```{python}
 pattern_hash = ue.hash_from_pattern([1, 0, 1, 0, 1])
 UE = ue.jointJ_window_analysis(trials, pattern_hash=pattern_hash)
 plot_ue(trials, UE, significance_level=0.01)
 ```
-:::
 
-:::{#exr-}
-(Bonus): Assuming that we don't know which exact pattern to look for, we can use UEA to search for all patterns that involve 3 out of the 5 neurons. Apply unitary event analaysis using the list of `pattern_hashes` generated below.
-```{python}
-patterns = [
-    [1, 1, 1, 0, 0],  # neurons 1,2,3 fire
-    [1, 1, 0, 1, 0],  # neurons 1,2,4 fire
-    [1, 1, 0, 0, 1],  # neurons 1,2,5 fire
-    [1, 0, 1, 1, 0],  # neurons 1,3,4 fire
-    [1, 0, 1, 0, 1],  # neurons 1,3,5 fire
-    [1, 0, 0, 1, 1],  # neurons 1,4,5 fire
-    [0, 1, 1, 1, 0],  # neurons 2,3,4 fire
-    [0, 1, 1, 0, 1],  # neurons 2,3,5 fire
-    [0, 1, 0, 1, 1],  # neurons 2,4,5 fire
-    [0, 0, 1, 1, 1],  # neurons 3,4,5 fire
-]
-pattern_hashes = [ue.hash_from_pattern(p) for p in patterns]
-```
 :::
-:::{sol.}
-```{python}
-UE = ue.jointJ_window_analysis(trials, pattern_hash=pattern_hashes)
-```
-:::
-
-Is there a way to plot only one specific pattern hash?
-```{python}
-idx = 4
-x = UE.copy()
-x["input_parameters"]["pattern_hash"] = [x["input_parameters"]["pattern_hash"][idx]]
-x["Js"] = x["Js"][:, idx]
-x["n_emp"] = x["n_emp"][:, idx]
-x["n_exp"] = x["n_exp"][:, idx]
-x["rate_avg"] = x["rate_avg"][:, idx]
-plot_ue(trials, x, significance_level=0.05)
-```
 
 
 ## Applying Unitary Event Analysis to Real Data
@@ -348,9 +342,10 @@ plot_ue(trials, x, significance_level=0.05)
 
 :::{#exm-}
 Load the spike trains for units 1 and 2, perform unitary event analysis and plot the results, highlighting the spikes that exceed the significance level of **0.01**.
+:::
+
 ```{python}
 trials = utils.load_spike_trains(unit_ids=[1, 2])
 UE = ue.jointJ_window_analysis(trials)
 plot_ue(trials, UE, significance_level=0.01)
 ```
-:::

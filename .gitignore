@@ -12,3 +12,4 @@
 *.egg-info
 */.jupyter_cache
 *.zip
+*.vdoc.*

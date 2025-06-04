@@ -18,20 +18,23 @@ import os
 import requests
 import zipfile
 
+
 url = "https://uni-bonn.sciebo.de/s/FV84Gvj3ZKHPN4Z"
 fname = "allen"
 
-if not os.path.exists("../data"):
-    os.mkdir("../data")
+os.makedirs("../data", exist_ok=True)
 
-if not os.path.exists(f"../data/{fname}"):
-    response = requests.get(f"{url}/download")
-    with open(f"{fname}.zip", "wb") as file:
-        file.write(response.content)
+print("Downloading data...")
+response = requests.get(f"{url}/download")
+with open(f"{fname}.zip", "wb") as file:
+    print('Writing Data to Disk...')
+    file.write(response.content)
 
-    with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
-        zip_ref.extractall(f"../data/{fname}")
-        os.remove(f"{fname}.zip")
+print("Unzipping data to the ../data folder")
+with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
+    zip_ref.extractall(f"../data/{fname}")
+    
+print("Done!")
 ```
 
 ## Computing the Firing Rate of a Neuron

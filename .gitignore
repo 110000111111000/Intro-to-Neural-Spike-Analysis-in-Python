@@ -11,3 +11,4 @@
 .pixi
 *.egg-info
 */.jupyter_cache
+*.zip

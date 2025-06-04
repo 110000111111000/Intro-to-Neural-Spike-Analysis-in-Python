@@ -280,7 +280,7 @@ def find_spikes_in_window(spikes, stimuli, tmin, tmax):
     spike_is_before_tplus =
     spike_is_in_window = spike_is_after_t & spike_is_before_tplus
 
-    mask =
+    mask = # your code here
     spikes_in_window = spikes[mask]
 
     return spikes_in_window

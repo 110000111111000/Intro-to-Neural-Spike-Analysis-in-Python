@@ -1,0 +1,123 @@
+---
+title: "Computing Neural Firing Rates"
+engine: Jupyter
+format: ipynb
+filter:
+    - assign
+execute: 
+  cache: true
+number-sections: true
+number-depth: 2
+---
+
+## Preparation
+
+```{python}
+import pandas as pd
+```
+
+Download the data
+```{python}
+import os
+import requests
+import zipfile
+
+
+url = "https://uni-bonn.sciebo.de/s/FV84Gvj3ZKHPN4Z"
+fname = "allen"
+
+os.makedirs("../data", exist_ok=True)
+
+print("Downloading data...")
+response = requests.get(f"{url}/download")
+with open(f"{fname}.zip", "wb") as file:
+    print('Writing Data to Disk...')
+    file.write(response.content)
+
+print("Unzipping data to the ../data folder")
+with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
+    zip_ref.extractall(f"../data/{fname}")
+    
+print("Done!")
+```
+
+## Computing the Firing Rate of a Neuron
+
+| Code | Description |
+| --- | --- |
+| `df = pd.read_parquet("mydata.parquet")` | Read the file `"mydata.parquet"` into a data frame `df` |
+| `df.head(n)` | Print the first `n` lines of the data frame `df` |
+| `df["col1"]` | Access the column `"col1"` of the data frame `df` |
+| `df["col1"].unique()` | Get the `.unique()` values stored in the column `"col1"` |
+| `mask = df["col1"]==1` | Create a `mask` that is `True` for every row where `"col1"` contains the value `1` |
+| `df[mask]` | Use the `mask` to filter the data frame `df` and get all rows where the `mask` is `True` |
+
+---
+
+
+:::{#exr-}
+Load the data stored in `"../data/flash_spikes.parquet"` into a data frame and assign it to a variable `spikes`, then print the first 5 rows.
+:::
+:::{sol.}
+```{python}
+session = "ses-778240327"
+spikes = pd.read_parquet(f"../data/allen/{session}/flash_spikes.parquet")
+spikes.head(5)
+```
+:::
+
+
+```{python}
+len(spikes)
+```
+
+```{python}
+spikes['brain_area'].value_counts()
+```
+
+```{python}
+spikes.groupby('brain_area').size()
+```
+
+```{python}
+spikes.groupby('brain_area').unit_id.nunique()
+```
+
+```{python}
+spikes.groupby('brain_area').unit_id.unique()
+```
+
+```{python}
+spikes.spike_time.max()
+```
+
+```{python}
+spikes.spike_time.max()
+```
+
+```{python}
+spikes.spike_time.max() - spikes.spike_time.min()
+```
+
+```{python}
+spikes.spike_time.describe()
+```
+
+```{python}
+import seaborn as sns
+import matplotlib.pyplot as plt
+```
+
+```{python}
+sns.countplot(data=spikes, x='brain_area');
+```
+
+```{python}
+plt.eventplot(spikes[:200].spike_time, linewidths=.5, color='black');
+```
+
+
+```{python}
+# plt.eventplot(spikes[:200].spike_time, linewidths=.5, color='black');
+spikes[:2000].groupby('unit_id').spike_time.unique().tolist()
+```

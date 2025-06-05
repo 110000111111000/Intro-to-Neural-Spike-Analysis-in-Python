@@ -12,6 +12,12 @@ number-depth: 2
 
 ## Preparation
 
+```{python}
+import numpy as np
+import pandas as pd
+from matplotlib import pyplot as plt
+```
+
 Download the data
 ```{python}
 import os
@@ -37,24 +43,182 @@ with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
 print("Done!")
 ```
 
-## Computing the Firing Rate of a Neuron
+## Exploring the Data
+
 
 | Code | Description |
 | --- | --- |
 | `df = pd.read_parquet("mydata.parquet")` | Read the file `"mydata.parquet"` into a data frame `df` |
 | `df.head(n)` | Print the first `n` lines of the data frame `df` |
-| `df["col1"]` | Access the column `"col1"` of the data frame `df` |
-| `df["col1"].unique()` | Get the `.unique()` values stored in the column `"col1"` |
-| `mask = df["col1"]==1` | Create a `mask` that is `True` for every row where `"col1"` contains the value `1` |
-| `df[mask]` | Use the `mask` to filter the data frame `df` and get all rows where the `mask` is `True` |
+| `df.shape` | Get the `shape` of a data frame (i.e. the number of rows and columns) |
+| `df.col1` | Access the column `col1` of the data frame `df` |
+| `df.col1.unique()` | Get the `.unique()` values stored in the column `col1` |
+| `df.col1.nunique()` | Get the number of unique values in the column `col` |
+| `df.col1.max()` | Get the maximum value in column `col1` |
 
 ---
+
+:::{#exr-}
+Load the data stored in `"../data/flash_spikes.parquet"` into a data frame and assign it to a variable `spikes`, then print the first 5 rows.
+:::
+:::{.sol}
+```{python}
+session = "ses-778240327"
+df = pd.read_parquet(f"../data/allen/{session}/flash_spikes.parquet")
+df.head(5)
+```
+:::
+
+:::{#exr-}
+How many spikes are there in the data frame (HINT: each row contains one spike)
+:::
+:::{.sol}
+```{python}
+df.shape[0]
+```
+:::
+
+:::{#exr-}
+At what time was the first and last spike recorded?
+:::
+:::{.sol}
+
+```{python}
+df.spike_time.min(), df.spike_time.max()
+```
+:::
+
+:::{#exr}
+From which (unique) brain areas were the spikes recorded?
+:::
+:::{.sol}
+```{python}
+df.brain_areas.unique()
+```
+:::
+
+:::{#exr-} 
+What is the total number of units recorded?
+:::
+:::{.sol}
+```{python}
+df.unit_id.nunique()
+```
+:::
+
+:::{#exr-}
+What is the number of units recorded in each brain area (HINT: use `df.groupby("brain_area")["unit_id"]`)?
+:::
+:::{.sol}
+```{python}
+df.groupby("brain_area").unit_id.nunique()
+```
+:::
+
+:::{#exr-}
+What is the number of spikes recorded from every unit?
+:::
+:::{.sol}
+```{python}
+df.groupby("unit_id").spike_time.nunique()
+```
+:::
+
+:::{#exr-}
+What is the smallest and largest number of spikes recorded from any single unit?
+:::
+:::{.sol}
+```{python}
+print(df.groupby("unit_id").spike_time.nunique().min())
+print(df.groupby("unit_id").spike_time.nunique().max())
+```
+:::
+
+## Visualizing Neural Firing with Rasterplots
+
+:::{#exr-}
+Get all spikes recorded from unit `951021564`
+:::
+```{python}
+df[df.unit_id == 951021564]
+```
+
+:::{#exr-}
+Create a rasterplot of the spikes recorded from unit `951021564` (HINT: use `plt.eventplot`).
+:::
+:::{.sol}
+```{python}
+plt.eventplot(df[df.unit_id == 951021564].spike_time)
+```
+:::
+
+:::{#exr-}
+Create a rasterplot of the spikes recorded from unit `951021564` and reduce the `linewidth` to `0.5`.
+:::
+:::{.sol}
+```{python}
+plt.eventplot(df[df.unit_id == 951021564].spike_time, linewidth=0.5)
+```
+:::
+
+:::{#exr-}
+Create a rasterplot for the units `951021564` and `951021835` (HINT: `plt.eventplot` accepts a lists as input).
+:::
+```{python}
+spike_times = [
+    df[df.unit_id == 951021564].spike_time,
+    df[df.unit_id == 951021835].spike_time,
+]
+plt.eventplot(spike_times, linewidth=0.5)
+```
+
+:::{#exm-}
+Get the spikes recorded from every unit in the primary visual cortex `"V1"`. Then, create a rasterplot displaying the spikes from each unit between `1300` and `1350` seconds.
+:::
+```{python}
+mask = df.brain_area == "V1"
+spike_times = df[mask].groupby("unit_id").spike_time.unique().tolist()
+plt.eventplot(spike_times, linewidth=0.5, linelengths=0.5, lineoffsets=1.5)
+plt.xlim(1300, 1350)
+```
+
+:::{#exr-}
+Create a rasterplot displaying the spikes from all units recorded in the posteriomedial area `"PM"` between `1300` and `1350` seconds.
+:::
+:::{.sol}
+```{python}
+mask = df.brain_area == "PM"
+spike_times = df[mask].groupby("unit_id").spike_time.unique().tolist()
+plt.eventplot(spike_times, linewidth=0.5, linelengths=0.5, lineoffsets=1.5)
+plt.xlim(1300, 1350)
+```
+:::
+
+:::{#exr-}
+Create a rasterplot displaying the spikes from all units recorded in the rostrolateral area `"RL"` between `1400` and `1600` seconds.
+:::
+:::{.sol}
+```{python}
+mask = df.brain_area == "RL"
+spike_times = df[mask].groupby("unit_id").spike_time.unique().tolist()
+plt.eventplot(spike_times, linewidth=0.5, linelengths=0.5, lineoffsets=1.5)
+plt.xlim(1400, 1500)
+```
+:::
+
+## Comparing Neural Firing Across Visual Areas
+
+## Statistical Comparison of Firing Rates
+
+
+## Computing the Firing Rate of a Neuron
+
 
 
 :::{#exr-}
 Load the data stored in `"../data/flash_spikes.parquet"` into a data frame and assign it to a variable `spikes`, then print the first 5 rows.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 session = "ses-778240327"
 spikes = pd.read_parquet(f"../data/allen/{session}/flash_spikes.parquet")
@@ -65,7 +229,7 @@ spikes.head(5)
 :::{#exr-}
 How many unique units does this data set contain?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 len(spikes["unit_id"].unique())
 ```
@@ -74,7 +238,7 @@ len(spikes["unit_id"].unique())
 :::{#exr-count}
 Find all rows where `spikes["unit_id"]==951035458` and compute the length of the filtered data frame to get the number of spikes produced by unit `951035458`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 count = len(spikes[spikes["unit_id"]==951035458])
 ```
@@ -83,7 +247,7 @@ count = len(spikes[spikes["unit_id"]==951035458])
 :::{#exr-dur}
 Get the duration of the recording by computing the difference between the first and last `"spike_time"`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 dur = spikes["spike_time"].max() - spikes["spike_time"].min()
 ```
@@ -92,7 +256,7 @@ dur = spikes["spike_time"].max() - spikes["spike_time"].min()
 :::{#exr-}
 Divide the number of spikes computed in @exr-count by the recording duration computed in @exr-dur to get the firing rate for unit `951035458`
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 count/dur
 ```
@@ -101,7 +265,7 @@ count/dur
 :::{#exr-}
 Compute the firing rate for unit `951026717`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 len(spikes[spikes["unit_id"] == 951026717]) / dur
 ```
@@ -122,7 +286,7 @@ len(spikes[spikes["unit_id"] == 951026717]) / dur
 :::{#exr-}
 Load the data stored in `"../data/flash_stimuli.parquet"` into a data frame and assign it to a variable `stimuli`, then print the first 5 rows.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 session = "ses-778240327"
 stimuli = pd.read_parquet(f"../data/allen/{session}/flash_stimuli.parquet")
@@ -137,7 +301,7 @@ unit = spikes[spikes["unit_id"] == 951026717]
 t = stimuli.loc[0, "start_time"]
 ```
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spike_is_after_t = unit["spike_time"] > t
 ```
@@ -153,7 +317,7 @@ spike_is_before_tplus = unit["spike_time"] < t + 0.5
 :::{#exr-}
 Combine the masks from @exr-after and @exr-before using the `&` operator to create a mask that filters the spikes that happen within the time window between `t` and `t+0.5`. `sum()` this mask to get the number of spikes within the window and divide it by the length of the window to get the firing rate.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spike_is_within_window = spike_is_after_t & spike_is_before_tplus
 sum(spike_is_within_window) / 0.5
@@ -163,7 +327,7 @@ sum(spike_is_within_window) / 0.5
 :::{#exr-}
 Get the firing rate of the same unit within **0.5 s** after the **10th** stimulus
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 unit = spikes[spikes["unit_id"] == 951026717]
 t = stimuli.loc[10, "start_time"]
@@ -177,7 +341,7 @@ sum(spike_is_within_window) / 0.5
 :::{#exr-}
 Get the firing rate of unit `951016662` **between 0.1 and 0.5 s** after the **10th** stimulus.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 unit = spikes[spikes["unit_id"] == 951016662]
 t = stimuli.loc[10, "start_time"]
@@ -203,7 +367,7 @@ sum(spike_is_in_window) / 0.4
 :::{#exr-}
 Export `stimuli["start_time"]` as a numypy array and assign it to avariable `t`. Then, print its `.shape`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 t = stimuli["start_time"].to_numpy()
 t.shape
@@ -213,7 +377,7 @@ t.shape
 :::{#exr-}
 Export `spikes["spike_time"]` as a numypy array and assign it to avariable `spike_time`. Then, print its `.shape`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spike_time = spikes["spike_time"].to_numpy()
 spike_time.shape
@@ -227,7 +391,7 @@ The cell below creates a mask that is `True` if a spike happens **after** stimul
 spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :]
 ```
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spike_is_after_t.shape
 ```
@@ -236,7 +400,7 @@ spike_is_after_t.shape
 :::{#exr-before2d}
 The cell below creates a mask that is `True` if a spike happens **before** stimulus onset plus **0.5 s** for every spike in `spike_time` and every stimulus in `t`. What is the .shape of `spike_is_after_t`?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spike_is_before_tplus = spike_time[:, np.newaxis] < t[np.newaxis, :] + 0.5
 ```
@@ -245,7 +409,7 @@ spike_is_before_tplus = spike_time[:, np.newaxis] < t[np.newaxis, :] + 0.5
 :::{#exr-mask2d}
 Combine the masks from @exr-after2d and @exr-before2d to create a mask that is `True` if a spike occurrs within **0.5 s** after stimulus onset for every spike in `spike_time` and every stimulus in `t`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spike_is_in_window = spike_is_after_t & spike_is_before_tplus
 ```
@@ -254,7 +418,7 @@ spike_is_in_window = spike_is_after_t & spike_is_before_tplus
 :::{#exr-}
 Use the `.any()` method on the mask from @exr-mask2d to get a 1D mask that is `True` if a spike falls within a **0.5 s** interval after any stimulus. Then, use that mask to filter th `spikes` data frame and assign the filtered data frame to a new variable `spikes_in_window`. Print the `len()` of this new data frame to get the total number of spikes that fall within a **0.5 s** interval after any stimulus.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 mask = spike_is_in_window.any(axis=1)
 spikes_in_window = spikes[mask]
@@ -289,7 +453,7 @@ def find_spikes_in_window(spikes, stimuli, tmin, tmax):
     return spikes_in_window
 ```
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 def find_spikes_in_window(spikes, stimuli, tmin, tmax):
     t = stimuli["start_time"].to_numpy()
@@ -332,7 +496,7 @@ n_units_v1 = len(spikes_v1["unit_id"].unique())
 :::{#exr-}
 Use `find_spikes_in_window()` to filter all spikes in `spikes_v1` that occurr between **0.02 and 0.06 s** after any stimulus.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin = 0.02
 tmax = 0.06
@@ -343,7 +507,7 @@ spikes_v1_in_window = find_spikes_in_window(spikes_v1, stimuli, tmin, tmax)
 :::{#exr-}
 Compute the population firing rate for `"V1"` between **0.02 and 0.06 s** after stimulus onset by taking the total number of spikes and dividing it by the number of units `n_units_v1` and the duration of the time window times the number of stimuli.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 len(spikes_v1_in_window)/n_units_v1/(len(stimuli)*(tmax-tmin))
 ```
@@ -352,7 +516,7 @@ len(spikes_v1_in_window)/n_units_v1/(len(stimuli)*(tmax-tmin))
 :::{#exr-}
 Compute the population firing rate for the anterolateral area `"AL"` between **0.02 and 0.06 s** after stimulus onset. Is it lower or higher than the population firing rate of V1?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 spikes_al = spikes[spikes["brain_area"] == "AL"]
 n_units_al = len(spikes_v1["unit_id"].unique())
@@ -364,7 +528,7 @@ len(spikes_al_in_window)/n_units_al/(len(stimuli)*(tmax-tmin))
 :::{#exr-}
 Compare the population firing rates of `"V1"` and `"AL"` between **0.04 and 0.1 s** after stimulus onset. Which one is higher in this time interval?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin = 0.04
 tmax = 0.1

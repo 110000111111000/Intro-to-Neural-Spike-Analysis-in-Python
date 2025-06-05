@@ -15,9 +15,11 @@ import numpy as np
 from matplotlib import pyplot as plt
 import quantities as pq
 from neo.core import Block, Segment, SpikeTrain, AnalogSignal
+from neo.io import NixIO
 import elephant.unitary_event_analysis as ue
 import elephant.conversion as conv
 from elephant.spike_train_generation import StationaryPoissonProcess, NonStationaryPoissonProcess
+from elephant.datasets import download_datasets
 from viziphant.unitary_event_analysis import plot_ue
 np.random.seed(15) # Fix random seed to guarantee fixed output
 %matplotlib inline
@@ -331,6 +333,23 @@ plot_ue(trials, UE, significance_level=0.01)
 
 :::
 
+## Rate Step
+
+
+```{python}
+base_rate = 5 * pq.Hz
+rate_step = 40 * pq.Hz
+rate_signal = np.ones(2000) * base_rate
+rate_signal[1000:1200] += rate_step
+rate_signal = AnalogSignal(rate_signal, sampling_rate=1000 * pq.Hz)
+neuron = NonStationaryPoissonProcess(rate_signal)
+trials = [neuron.generate_n_spiketrains(2) for i in range(50)]
+```
+
+```{python}
+UE = ue.jointJ_window_analysis(trials)
+plot_ue(trials, UE, significance_level=0.01)
+```
 
 ## Applying Unitary Event Analysis to Real Data
 
@@ -348,4 +367,27 @@ Load the spike trains for units 1 and 2, perform unitary event analysis and plot
 trials = utils.load_spike_trains(unit_ids=[1, 2])
 UE = ue.jointJ_window_analysis(trials)
 plot_ue(trials, UE, significance_level=0.01)
+```
+
+
+```{python}
+repo_path = "tutorials/tutorial_unitary_event_analysis/data/dataset-1.nix"
+filepath = download_datasets(repo_path)
+io = NixIO(f"{filepath}", "ro")
+block = io.read_block()
+spiketrains = []
+# each segment contains a single trial
+for ind in range(len(block.segments)):
+    spiketrains.append(block.segments[ind].spiketrains)
+UE = ue.jointJ_window_analysis(
+    spiketrains,
+    bin_size=5 * pq.ms,
+    win_size=100 * pq.ms,
+    win_step=10 * pq.ms,
+    pattern_hash=[3],
+)
+
+plot_ue(spiketrains, UE, significance_level=0.05)
+plt.show()
+
 ```

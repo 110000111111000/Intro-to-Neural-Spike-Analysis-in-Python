@@ -13,3 +13,4 @@
 */.jupyter_cache
 *.zip
 *.vdoc.*
+*.parquet

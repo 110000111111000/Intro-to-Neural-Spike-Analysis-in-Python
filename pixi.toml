@@ -19,6 +19,8 @@ spikeinterface = { version = ">=0.102.3, <0.103", extras = ["full", "widgets"] }
 hdbscan = ">=0.8.40, <0.9"
 torch = ">=2.7.0, <3"
 kneed = ">=0.8.5, <0.9"
+nixio = ">=1.5.4, <2"
+pingouin = ">=0.5.5, <0.6"
 
 [feature.render.dependencies]
 jupyter-cache="*"

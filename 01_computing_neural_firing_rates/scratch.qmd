@@ -104,6 +104,7 @@ spikes.spike_time.describe()
 ```
 
 ```{python}
+import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
 ```
@@ -119,5 +120,63 @@ plt.eventplot(spikes[:200].spike_time, linewidths=.5, color='black');
 
 ```{python}
 # plt.eventplot(spikes[:200].spike_time, linewidths=.5, color='black');
-spikes[:2000].groupby('unit_id').spike_time.unique().tolist()
+ss = spikes[:3000].groupby('unit_id').spike_time.unique().tolist()
+plt.eventplot(ss);
+```
+
+
+```{python}
+
+plt.figure(figsize=(20, 15))
+
+ss = [g.spike_time.values for _, g in spikes.groupby('unit_id')]
+plt.eventplot(ss, linewidths=.5, );
+```
+
+```{python}
+len(spikes)
+```
+
+```{python}
+ss = np.array([np.histogram(g.spike_time, bins=1000)[0] for _, g in spikes.groupby('unit_id')])
+plt.imshow(ss > 0, aspect='auto', cmap='gray_r', origin='lower');
+```
+
+
+```{python}
+spikes
+```
+
+
+
+```{python}
+session = "ses-778240327"
+stimuli = pd.read_parquet(f"../data/allen/{session}/flash_stimuli.parquet")
+stimuli.head()
+```
+
+
+```{python}
+merged = pd.merge_asof(
+    spikes,
+    stimuli,
+    left_on='spike_time',
+    right_on='start_time',
+    direction='backward',
+)
+merged
+```
+
+
+```{python}
+plt.hist(merged['spike_time'] - merged['start_time'], bins=60);
+```
+
+```{python}
+merged
+```
+
+```{python}
+merged['spike_time2'] = merged['spike_time'] - merged['start_time']
+sns.kdeplot(data=merged.sample(100000), x='spike_time2', hue='brain_area');
 ```

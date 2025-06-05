@@ -11,6 +11,7 @@ version = "0.1.0"
 python = "3.12.*"
 jupyter = ">=1.1.1,<2"
 pyarrow = ">=20.0.0,<21"
+pip = ">=25.1.1,<26"
 
 [pypi-dependencies]
 elephant = { version = ">=1.1.1, <2", extras = ["extras"] }
@@ -18,7 +19,6 @@ viziphant = ">=0.4.0, <0.5"
 spikeinterface = { version = ">=0.102.3, <0.103", extras = ["full", "widgets"] }
 hdbscan = ">=0.8.40, <0.9"
 torch = ">=2.7.0, <3"
-kneed = ">=0.8.5, <0.9"
 nixio = ">=1.5.4, <2"
 pingouin = ">=0.5.5, <0.6"
 

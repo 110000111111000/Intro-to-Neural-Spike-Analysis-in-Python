@@ -1,11 +1,9 @@
 ---
-title: "Computing Neural Firing Rates"
+title: "Surveying Neural Spiking in Visual Cortex"
 engine: Jupyter
 format: ipynb
-filter:
+filters:
     - assign
-execute: 
-  cache: true
 number-sections: true
 number-depth: 2
 ---
@@ -23,6 +21,7 @@ import pingouin as pg
 
 Download the data required for this notebook
 ```{python}
+# | eval: false
 import requests
 
 url = "https://uni-bonn.sciebo.de/s/mLMkb2TwbNx3Yg6"
@@ -61,6 +60,12 @@ df = pd.read_parquet("flash_spikes.parquet")
 df.head(5)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 How many spikes are there in the data frame (HINT: each row contains one spike)
@@ -70,14 +75,25 @@ How many spikes are there in the data frame (HINT: each row contains one spike)
 df.shape[0]
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 At what time was the first and last spike recorded?
 :::
 :::{.sol}
-
 ```{python}
 df.spike_time.min(), df.spike_time.max()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -89,6 +105,12 @@ From which (unique) brain areas were the spikes recorded?
 df.brain_area.unique()
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-} 
 What is the total number of units recorded?
@@ -98,7 +120,12 @@ What is the total number of units recorded?
 df.unit_id.nunique()
 ```
 :::
-
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-nunique}
 What is the number of spikes recorded from every unit?
@@ -106,6 +133,12 @@ What is the number of spikes recorded from every unit?
 :::{.sol}
 ```{python}
 df.groupby("unit_id").spike_time.count()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -117,6 +150,12 @@ What is the number of units recorded in each brain area (HINT: use `df.groupby("
 df.groupby("brain_area").unit_id.nunique()
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 What is the smallest and largest number of spikes recorded from any single unit?
@@ -125,6 +164,12 @@ What is the smallest and largest number of spikes recorded from any single unit?
 ```{python}
 print(df.groupby("unit_id").spike_time.count().min())
 print(df.groupby("unit_id").spike_time.count().max())
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -146,9 +191,17 @@ Even though the metrics we computed in the previous section are useful for descr
 :::{#exr-}
 Get all spikes recorded from unit `951021564`
 :::
+:::{.sol}
 ```{python}
 df[df.unit_id == 951021564]
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a rasterplot of the spikes recorded from unit `951021564` (HINT: use `plt.eventplot`).
@@ -156,6 +209,12 @@ Create a rasterplot of the spikes recorded from unit `951021564` (HINT: use `plt
 :::{.sol}
 ```{python}
 plt.eventplot(df[df.unit_id == 951021564].spike_time)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -167,10 +226,17 @@ Create a rasterplot of the spikes recorded from unit `951021564` and reduce the 
 plt.eventplot(df[df.unit_id == 951021564].spike_time, linewidth=0.5)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a rasterplot for the units `951021564` and `951021835` (HINT: `plt.eventplot` accepts a lists as input).
 :::
+:::{.sol}
 ```{python}
 spike_times = [
     df[df.unit_id == 951021564].spike_time,
@@ -178,6 +244,13 @@ spike_times = [
 ]
 plt.eventplot(spike_times, linewidth=0.5)
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exm-}
 Extract the spikes recorded from every unit in the primary visual cortex `"V1"`. 
@@ -196,6 +269,12 @@ plt.eventplot(spike_times, linewidth=0.5, linelengths=0.5, lineoffsets=1.5)
 plt.xlim(1300, 1350)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a rasterplot displaying the spikes from all units recorded in the posteriomedial area `"PM"` between `1300` and `1350` seconds.
@@ -208,6 +287,12 @@ plt.eventplot(spike_times, linewidth=0.5, linelengths=0.5, lineoffsets=1.5)
 plt.xlim(1300, 1350)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a rasterplot displaying the spikes from all units recorded in the rostrolateral area `"RL"` between `1400` and `1500` seconds.
@@ -218,6 +303,12 @@ mask = df.brain_area == "RL"
 spike_times = df[mask].groupby("unit_id").spike_time.unique().tolist()
 plt.eventplot(spike_times, linewidth=0.5, linelengths=0.5, lineoffsets=1.5)
 plt.xlim(1400, 1500)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -244,6 +335,12 @@ Create a `sns.countplot` that displays the number of spikes recorded from each `
 sns.countplot(df, x="brain_area")
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a `sns.countplot` that displays the number of spikes recorded from each `"unit"` (HINT: you can remove the x-ticks with `plt.xticks([])`).
@@ -254,14 +351,26 @@ sns.countplot(df, x="unit_id")
 plt.xticks([])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
-Create a `sns.countplot` that displays the number of spikes recorded from each `"unit"` and add a `hue` to encode the `"brain_area"`.
+Create a `sns.countplot` that displays the number of spikes recorded from each `"unit"` and add a `hue` to encode `"brain_area"`.
 :::
 :::{.sol}
 ```{python}
 sns.countplot(data=df, x="unit_id", hue="brain_area")
 plt.xticks([])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -274,6 +383,12 @@ sns.countplot(data=df, y="unit_id", hue="brain_area")
 plt.yticks([])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a `sns.kdeplot` to visualize the distribution of `"spike_time"`
@@ -281,6 +396,12 @@ Create a `sns.kdeplot` to visualize the distribution of `"spike_time"`
 :::{.sol}
 ```{python}
 sns.kdeplot(df, x="spike_time")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -292,14 +413,28 @@ Create a `sns.kdeplot` to visualize the distribution of `"spike_time"` and add a
 sns.kdeplot(df, x="spike_time", hue="brain_area")
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Compute the number of units recorded in each brain area and plot the result as a `sns.barplot` (HINT: the function only requires a single argument).
 :::
+:::{.sol}
 ```{python}
 grouping = df.groupby("brain_area").unit_id.nunique()
 sns.barplot(grouping)
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Get the number of spikes recorded from each brain area and divide it by the number of units recorded in each area to get the average number of spikes per unit in each area. Then, plot the result as a `sns.barplot`.
@@ -312,8 +447,14 @@ grouping = (
 )
 
 sns.barplot(grouping)
-:::
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 ## Statistical Comparison of Firing Rates across Areas
 
@@ -338,9 +479,15 @@ Compute the number of spike times for each `"brain_area"` and `"unit_id"`.
 df.groupby(["brain_area", "unit_id"]).spike_time.nunique()
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
-Divide the result from @exr-count by the duration of the recording to get the firing rate of every unit (HINT: you can approximate the duration as the difference between the first and last `"spike_time"`). Assign th result to a new variable `fr`.
+Divide the result from @exr-count by the duration of the recording to get the firing rate of every unit (HINT: you can approximate the duration as the difference between the first and last `"spike_time"`). Assign the result to a new variable `fr`.
 :::
 :::{.sol}
 ```{python}
@@ -348,14 +495,27 @@ dur = df.spike_time.max() - df.spike_time.min()
 fr = df.groupby(["brain_area", "unit_id"]).spike_time.nunique() / dur
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
-Use `fr.reset_index()` to create a new data frame where each row represents one unit and print it (HINT: the method does not modify `fr` so you must expliclity overwrite the original value). Then, rename the columns to label the new column with `"firing_rate"`.
+Use `fr.reset_index()` to create a new data frame where each row represents one unit (HINT: the method does not modify `fr` so you must expliclity overwrite the original value). Then, rename the columns to label the new column with `"firing_rate"` and print the renamed data frame.
 :::
 :::{.sol}
 ```{python}
 fr = fr.reset_index()
-fr.columns = ["unit_id", "brain_area", "firing_rate"]
+fr.columns = ["brain_area", "unit_id", "firing_rate"]
+fr
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -374,6 +534,12 @@ Create a `sns.barplot` for the standard deviation `"std"` of the `"firing_rate"`
 sns.barplot(fr, x="brain_area", y="firing_rate", estimator="std")
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Create a `sns.kdeplot` to visualize the distribution of `"firing_rate"` and add a `hue` to encode the `"brain_area"`.
@@ -383,6 +549,12 @@ Create a `sns.kdeplot` to visualize the distribution of `"firing_rate"` and add 
 sns.kdeplot(fr, x="firing_rate", hue="brain_area")
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Re-create the `sns.kdeplot` but use `common_norm=False` to account for the difference in the number of recorded units per area.
@@ -390,6 +562,12 @@ Re-create the `sns.kdeplot` but use `common_norm=False` to account for the diffe
 :::{.sol}
 ```{python}
 sns.kdeplot(fr, x="firing_rate", hue="brain_area", common_norm=False)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -403,13 +581,21 @@ pg.mwu(x, y)
 ```
 
 :::{#exr-}
-Look at the graph created in @exr-mean that showed the mean firing rates for each `.brain_area`. Based on this plot, which differences would you expect to be significant? Test you expectation by performing Mann-Whitney-U-Test on the respective pair(s).
+Look at the graph created in @exm-mean that showed the mean firing rates for each brain area. Based on this plot, which differences would you expect to be significant? Test you expectation by performing Mann-Whitney-U-Test on the respective pair(s).
 :::
+:::{.sol}
 ```{python}
 x = fr[fr.brain_area == "PM"].firing_rate
 y = fr[fr.brain_area == "AM"].firing_rate
 pg.mwu(x,y)
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exm-}
 Apply the Bonferroni correction to adjust the p-values for multiple comparisons and compare them to the given threshold `alpha`.
@@ -422,4 +608,10 @@ pg.multicomp(pvals, alpha, method="bonferroni")
 
 :::{#exr-}
 Apply the Bonferroni correction to adjust the p-values returned by the statistical tests you performed in the exercises before. Are the results still significant after correction?
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
 :::

@@ -1,11 +1,9 @@
 ---
-title: "Computing Neural Firing Rates"
+title: "Relating Neural Firing to Stimuli"
 engine: Jupyter
 format: ipynb
-filter:
+filters:
     - assign
-execute: 
-  cache: true
 number-sections: true
 number-depth: 2
 ---
@@ -17,43 +15,29 @@ Import the modules required for this session
 import pandas as pd
 import numpy as np
 from matplotlib import pyplot as plt
+import seaborn as sns
 from scipy.stats import wilcoxon
+%matplotlib inline
 ```
 
-Define functions required for this session
-```{python}
-class utils:
-    def find_spikes_in_window(spikes, stimuli, tmin, tmax):
-        t = stimuli["start_time"].to_numpy()
-        spike_time = spikes["spike_time"].to_numpy()
-        spike_is_after_t = spike_time[:, np.newaxis] > t[np.newaxis, :] + tmin
-        spike_is_before_tplus = spike_time[:, np.newaxis] < t[np.newaxis, :] + tmax
-        spike_is_in_window = spike_is_after_t & spike_is_before_tplus
-        mask = spike_is_in_window.any(axis=1)
-        spikes_in_window = spikes[mask]
-        return spikes_in_window.reset_index()
-```
 
 Download the data required for this session
 ```{python}
-import os
+# | eval: false
 import requests
-import zipfile
 
-urls = ["https://uni-bonn.sciebo.de/s/G64EkHoQkeZeoLm"]
-fnames = ["flash_stimuli.parquet"]
+urls = [
+    "https://uni-bonn.sciebo.de/s/G64EkHoQkeZeoLm",
+    "https://uni-bonn.sciebo.de/s/mLMkb2TwbNx3Yg6",
+]
+fnames = ["flash_stimuli.parquet", "flash_spikes.parquet"]
 
-if not os.path.exists("../data"):
-    os.mkdir("../data")
-
-if not os.path.exists(f"../data/{fname}"):
+for url, fname in zip(urls, fnames):
     response = requests.get(f"{url}/download")
-    with open(f"{fname}.zip", "wb") as file:
+    print("Downloading Data ...")
+    with open(fname, "wb") as file:
         file.write(response.content)
-
-    with zipfile.ZipFile(f"{fname}.zip", "r") as zip_ref:
-        zip_ref.extractall(f"../data/{fname}")
-        os.remove(f"{fname}.zip")
+    print("Done!")
 ```
 
 
@@ -61,476 +45,441 @@ if not os.path.exists(f"../data/{fname}"):
 
 | Code | Description |
 | --- | --- |
-| `df = pd.read_parquet("mydata.parquet")` | Read the file `"mydata.parquet"` into a data frame `df` |
-| `utils.find_spikes_in_window(spikes, stimuli, tmin, tmax)` | Find the spikes that occurr between `tmin` and `tmax` with respect to the stimuli |
-| `np.searchsorted(x, 5)` | Search the location in the sorted array `x` where you could insert the value `5` while keeping the sorting |
+| `df = pd.read_parquet(mydata.paquet)` | Read the file `"mydata.parquet"` into a data frame |
+| `pd.merge_asof(left, right, left_on, right_on)` | Merge data frames `left` and `right` based on the columns `left_on` and `right_on` |
+| `df["newcol"] = values` | Add a new column named `"newcol"` to `df` and assign it the `values` |
+| `df[df.col1<1]` | Get all rows of `df` where the value of `"col1"` is smaller than 1 |
+| `sns.histplot(df, x="col1", hue="col2")` | Plot a histogram of the values in `"col1"` and add a `hue` for the categories in `"col2"` |
+| `plt.axvline(x, ymin, ymax)` | Add a vertical line at `x` that goes from `ymin` to `ymax` |
+| `plt.xlim(xmin, xmax)` | Limit the x-axis to the range between `xmin` and `xmax` |
 
 ---
 
 :::{#exr-}
-Load the data stored in the the files `"../data/flash_spikes.parquet"` and `"../data/flash_stimuli.parquet"` and assign them to two variables called `spikes` and `stimuli`.
+Load the data stored in the files `"flash_spikes.parquet"` and `"flash_stimuli.parquet"` into data frames and assign them to variables called `spikes` and `stimuli`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-session = "ses-778240327"
-spikes = pd.read_parquet(f"../data/allen/{session}/flash_spikes.parquet")
-stimuli = pd.read_parquet(f"../data/allen/{session}/flash_stimuli.parquet")
-```
-:::
-
-:::{#exr-}
-Use the function `utils.find_spikes_in_window()` to find all spikes that happend between **-0.5 and 0.5 s** after stimulus onset. Overwrite the value of `spikes` with the returned data frame.
-:::
-:::{sol.}
-```{python}
-spikes = utils.find_spikes_in_window(spikes, stimuli, -0.5, 0.5)
+spikes = pd.read_parquet("flash_spikes.parquet")
+stimuli = pd.read_parquet("flash_stimuli.parquet")
 ```
 :::
 
 :::{#exm-}
-Get the 20th stimulus onset time `t` and use `np.searchsorted` to find the index of the first spike after `t-0.5` and assign it to the variable `idx_start`. Then, get the spike at that index.
+Use `pd.merge_asof()` to merge the `spikes` and `stimuli` based on the `"spike_time"` and `"start_time"`. In the resulting `df`, each spike is paired with the last stimulus that was presented before that spike.
+:::
 ```{python}
-t = stimuli.loc[20, "start_time"]
-idx_start = np.searchsorted(spikes["spike_time"], t - 0.5)
-spikes.loc[idx_start]
+df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on="start_time")
+df
+```
+
+:::{#exr-}
+Subtract the stimulus `.start_time` column from the `.spike_time` column to get the spike times relative to stimulus onset. Then, print the smallest spike time in `df`.
+:::
+:::{.sol}
+```{python}
+df.spike_time = df.spike_time - df.start_time
+df.spike_time.min()
 ```
 :::
 
 :::{#exr-}
-Use `np.searchsor` to get the first spike after `t+0.5` and assign it to the variable `idx_stop`. Subtract 1 from `idx_stop` to ensure the spike is contained within the interval from **-0.5 to 0.5 s** and get the spike at that index.
+The smallest spike time should be very close to 0. However, we would like our analysis time window to include spikes that happen before the stimulus as well. Add a new column to `stimuli` called `"analysis_window_start"` that is equal to the stimulus `"start_time"` minus `0.5` seconds. Print the `stimuli` to make sure the new column was created.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-idx_stop = np.searchsorted(spikes["spike_time"], t + 0.5) - 1
-spikes.loc[idx_stop]
-```
-:::
-
-:::{#exm-}
-Get all spikes between `idx_start` and `idx_stop` and subtract `t` to get the spike times relative to stimulus onset.
-```{python}
-spikes.loc[idx_start:idx_stop, "spike_time"] - t
+stimuli["analysis_window_start"] = stimuli["start_time"] - 0.5
+stimuli
 ```
 :::
 
 :::{#exr-}
-The cell below uses `np.searchsorted` to find the location of the first spike **0.5 s before** stimulus onset for every stimulus. What is the length of `indices_start`?
-```{python}
-indices_start = np.searchsorted(spikes["spike_time"], stimuli["start_time"] - 0.5)
-```
+Use `pd.merge_asof()` with `right_on="analysis_window_start"` to match each spike with the analysis window that started before it.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-len(indices_start)
-```
-:::
-
-:::{#exr-}
-Use `np.searchsorted` to find the first spike **0.5 s after** stimulus onset for every stimulus and subtract 1 from the returned indices to get the last spike **before** 0.5 seconds have passed.
-:::
-:::{sol.}
-```{python}
-indices_stop = np.searchsorted(spikes["spike_time"], stimuli["start_time"] + 0.5) - 1
+df = pd.merge_asof(
+    spikes, stimuli, left_on="spike_time", right_on="analysis_window_start"
+)
+df
 ```
 :::
 
 :::{#exr-}
-The `for` loop below goes trough all the indices and stimulus times. Complete the loop by subtracting the stimulus onset time `t` from every spike between `idx_start` and `idx_stop` to calculate the spike times relatve to stimulus onset.
-```{python}
-# | eval: false
-for idx_start, idx_stop, t in zip(indices_start, indices_stop, stimuli["start_time"]):
-    spikes.loc[idx_start:idx_stop, "spike_time"] =
-```
+Subtract the stimulus `.start_time` column from the `.spike_time` column to get the spike times relative to stimulus onset. Then, print the smallest spike time in `df` this value should be very close to `-0.5`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-# | eval: false
-for idx_start, idx_stop, t in zip(indices_start, indices_stop, stimuli["start_time"]):
-    spikes.loc[idx_start:idx_stop, "spike_time"] -= t
+df.spike_time = df.spike_time - df.start_time
+df.spike_time.min()
 ```
 :::
 
 :::{#exr-}
-Get the minimum and maximum `"spike_time"` in `spikes`. They should be within the time interval between **-0.5 and 0.5 s**. w
+Remove all the the rows in `df` where the `"spike_time"` relative to stimulus onset is greater than `1` second and print the maximum spike time.
 :::
+:::{.sol}
 ```{python}
-print(spikes["spike_time"].min())
-print(spikes["spike_time"].max())
+df = df[df.spike_time <= 1]
+df.spike_time.max()
 ```
+:::
 
-## Binning Continuous Spikes into a Histogram
+:::{#exr-}
+Use `sns.histplot` to create a histogram of spike times relative to stimulus onset.
+:::
+:::{.sol}
+```{python}
+sns.histplot(df, x="spike_time")
+```
+:::
+
+:::{#exr-}
+Use `sns.histplot` to create a histogram of spike times and use `plt.axvline()` to add vertical lines that mark the stimulus onset at `0` seconds and the offset at `0.25` seconds (HINT: try using `color="black"` and `linestyle="--"` to make them look nice). Can you see the relationship between the spiking and stimuli?
+:::
+:::{.sol}
+```{python}
+sns.histplot(df, x="spike_time")
+plt.axvline(x=0, ymin=0, ymax=1, color="black", linestyle='--')
+plt.axvline(x=0.25, ymin=0, ymax=1, color="black", linestyle='--')
+```
+:::
+
+:::{#exr-}
+Add a `hue` to the histogram that encodes the `"brain_area"`.
+:::
+:::{.sol}
+```{python}
+sns.histplot(df, x="spike_time", hue="brain_area")
+```
+:::
+
+:::{#exr-}
+Increate the number of `bins` in the histogram to improve the temporal resolution and limit the x-axis to the first `0.15` second after stimulus onset. Can you see which brain area responds first?
+:::
+:::{.sol}
+```{python}
+sns.histplot(df, x="spike_time", hue="brain_area", bins=300)
+plt.xlim(0, 0.15)
+```
+:::
+
+## Comparing Neural Spiking to a Baseline
 
 | Code | Description |
 | --- | --- |
-| `np.linspace(start, stop, n)` | Create a vector of `n` elements linearliy spaced between `start` and `stop` |
-| `counts, bins = np.histogram(x, bins)` | Create a histogram of the data in `x` and return the edges of the `bins` and the `counts` of observations per bin |
-| `plt.bar(x, height, width)` | Create a bar plot with bars at locations `x` with a given `heigt` and `width` |
-| `plt.axvline(x, ymin, ymax)` | Draw a vertical line at `x` between `ymin` and `ymax` |
+| `np.arange(start, stop, stepsize)` | Create an array of evenly spaced elements between `start` and `stop` with the given `stepsize` |
+| `df.groupby(["col1", "col2"]).col3.mean()` | Group the data by columns `"col1"` and `"col2"` and calulcate the `.mean()` of `"col3"` for each grouping |
+| `df.groupby(["col1", "col2"]).col3.apply(fun)` | Group the data by columns `"col1"` and `"col2"` and `.apply()` the function `fun` to `"col3"` for each grouping |
+| `df = df.reset_index()` | reset the index of `df` and store the old index in a new column |
+| `df = df.reset_index(drop=True)` | reset the index of `df` and drop the old index |
+| `df.columns = ["new1", "new2"]` | Rename the columns of `df` to `"new1"` and `"new2"` |
+| `df.explode("col1")` | `.explode()` the colum `"col1"` which contains lists so that a new row is created for every element |
+| `df.explode(["col1", "col2"])` | `.explode()` the colums `"col1"` and `"col2"` so that a new row is created for every element |
+| `df1.col1.map(df2)` | Map `df2` to `df1` based on the column `col1` |
+| `sns.lineplot(df, x="col1", y="col2", hue="col3")` | Plot the values in `"col1"` against `"col2"` and add a `hue` based on `"col3"` |
+| `sns.lineplot(df, x="col1", y="col2", units="col3", estimator=None)` | Plot the values in `"col1"` against `"col2"` separately for all `units` in `"col3"` |
 
+:::{#exr-}
+Use `np.arange` to create an array of evenly spaced bins between `0` and `1` seconds that are `0.005` seconds wide. Print the number of bins in the array. 
+:::
+:::{.sol}
+```{python}
+bins = np.arange(0, 1, 0.01)
+bins.shape
+```
+:::
+
+:::{#exr-}
+Use `np.arange` to create an array of evenly spaced bins between `0` and `0.5` seconds that are `0.01` seconds wide. Print the number of bins in the array. 
+:::
+:::{.sol}
+```{python}
+bins = np.arange(-0.5, 1, 0.005)
+bins.shape
+```
+:::
+
+:::{#exm-psth}
+Use `.groupby()` to group the `df` by `"unit_id"` and `"brain_area"` and `.apply()` the `np.histogram` function with the previously created `bins` to the spike times. Write the result to a new variable called `psths` and select the first element in each row (which contains the spike counts).
+:::
+```{python}
+psths = df.groupby(["unit_id", "brain_area"]).spike_time.apply(np.histogram, bins=bins)
+psths = psths.str[0]
+psths
+```
+
+:::{#exr-}
+Use the `.reset_index()` method to transform the `psths` to a data frame and label the `.columns` as `"unit_id"`, `"brain_area"` and `"spike_count"`. Print the resulting data frame.
+:::
+:::{.sol}
+```{python}
+psths = psths.reset_index()
+psths.columns = ["unit_id", "brain_area", "spike_count"]
+psths
+```
+:::
 
 :::{#exm-}
-Create linearly spaced `bins` between **-0.5 and 0.5 s** that are **10 ms** wide and print them.
+Compute the `bin_centers` and store them in new column called `"time"`.
 :::
 ```{python}
-bin_size = 0.010
-tmin = -0.5
-tmax = 0.5
-n_bins = int((tmax - tmin) / bin_size)
-bins = np.linspace(tmin, tmax, n_bins + 1)
-bins
+bin_centers = (bins[:-1] + bins[1:]) / 2
+psths["time"] = [bin_centers for i in range(len(psths))]
 ```
 
 :::{#exr-}
-Create linearly spaced `bins` between **-0.1 and 0.4 s** that are **10 ms** wide and print them.
+Use the `.explode()` method to extend the columns `["spike_count", "time"]`. Overwrite the `psths` data frame with the returned value and print it.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-bin_size = 0.010
-tmin = -0.1
-tmax = 0.4
-n_bins = int((tmax - tmin) / bin_size)
-bins = np.linspace(tmin, tmax, n_bins + 1)
-bins
+psths = psths.explode(["spike_count", "time"]).reset_index(drop=True)
+psths
 ```
 :::
 
 :::{#exr-}
-Create linearly spaced `bins` between **-0.2 and 0.5 s** that are **20 ms** wide and print them.
+Create an `sns.lineplot` of the average `"spike_count"` across `"time"`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-bin_size = 0.020
-tmin = -0.2
-tmax = 0.4
-n_bins = int((tmax - tmin) / bin_size)
-bins = np.linspace(tmin, tmax, n_bins + 1)
-bins
-```
-:::
-
-:::{#exm-}
-Create a histogram for the `spike_time` from unit `951035143` and normalize the spike `counts` by the number of stimuli and bin size to get the peri-stimulus time histgram (PSTH).
-:::
-```{python}
-spike_time = spikes[spikes["unit_id"] == 951035143]["spike_time"]
-counts, bin_edges = np.histogram(spike_time, bins=bins)
-psth = counts / (len(stimuli) * bin_size)
-```
-
-:::{#exm-}
-Compute the `bin_centers` and visualize the PSTH as a bar plot where each bar is one bin. Add dashed vertial lines that mark the stimulus onset and offset
-:::
-```{python}
-bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-plt.bar(bin_centers, psth, width=bin_size)
-plt.axvline(x=0, ymin=0, ymax=1, linestyle="--", color="black")
-plt.axvline(x=0.25, ymin=0, ymax=1, linestyle="--", color="black")
-plt.xlabel("Time [s]")
-plt.ylabel("Firing Rate [Hz]")
-```
-
-:::{#exr-}
-Plot the PSTH for unit `951031253`.
-:::
-:::{sol.}
-```{python}
-spike_time = spikes[spikes["unit_id"] == 951031253]["spike_time"]
-counts, bin_edges = np.histogram(spike_time, bins=bins)
-psth = counts / (len(stimuli) * bin_size)
-bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-plt.bar(bin_centers, psth, width=bin_size)
-plt.axvline(x=0, ymin=0, ymax=1, linestyle="--", color="black")
-plt.axvline(x=0.25, ymin=0, ymax=1, linestyle="--", color="black")
-plt.xlabel("Time [s]")
-plt.ylabel("Firing Rate [Hz]")
-```
-:::
-
-:::{#exr-psth1}
-Plot the PSTH for unit `951031253` again but reduce the `bin_size` to **5 ms**. Does this reveal any new information about the firing behavior of this neuron?
-:::
-:::{sol.}
-```{python}
-bin_size = 0.005
-tmin = -0.2
-tmax = 0.4
-n_bins = int((tmax - tmin) / bin_size)
-bins = np.linspace(tmin, tmax, n_bins + 1)
-
-spike_time = spikes[spikes["unit_id"] == 951031253]["spike_time"]
-counts, bin_edges = np.histogram(spike_time, bins=bins)
-psth = counts / (len(stimuli) * bin_size)
-bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-plt.bar(bin_centers, psth, width=bin_size)
-plt.axvline(x=0, ymin=0, ymax=1, linestyle="--", color="black")
-plt.axvline(x=0.25, ymin=0, ymax=1, linestyle="--", color="black")
-plt.xlabel("Time [s]")
-plt.ylabel("Firing Rate [Hz]")
-```
-:::
-
-:::{#exr-psth2}
-Plot the PSTH for unit `951026700` between **-0.5 and 0.5 s** with a `bin_size` of **10 ms**. Does it look like the response of this unit is modulated by the stimulus?
-:::
-:::{sol.}
-```{python}
-bin_size = 0.010
-tmin = -0.5
-tmax = 0.5
-n_bins = int((tmax - tmin) / bin_size)
-bins = np.linspace(tmin, tmax, n_bins + 1)
-spike_time = spikes[spikes["unit_id"] == 951026700]["spike_time"]
-counts, bin_edges = np.histogram(spike_time, bins=bins)
-psth = counts / (len(stimuli) * bin_size)
-bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-plt.bar(bin_centers, psth, width=bin_size)
-plt.axvline(x=0, ymin=0, ymax=1, linestyle="--", color="black")
-plt.axvline(x=0.25, ymin=0, ymax=1, linestyle="--", color="black")
-plt.xlabel("Time [s]")
-plt.ylabel("Firing Rate [Hz]")
+sns.lineplot(psths, x="time", y="spike_count")
 ```
 :::
 
 :::{#exr-}
-Complete the `compute_psth` function below by comuting the value of `psth`.
-```{python}
-# | eval: false
-def compute_psth(spike_time, tmin, tmax, bin_size):
-    n_bins = int((tmax - tmin) / bin_size)
-    bins = np.linspace(tmin, tmax, n_bins + 1)
-    counts, bin_edges = np.histogram(spike_time, bins=bins)
-    psth = # your code here
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    return psth, bin_centers
-```
+Compute the baseline firing rate of each unit by selecting the rows of `psths` where `psths.time<0`, grouping them by `"unit_id"` and calculating the mean spike count.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-def compute_psth(spike_time, tmin, tmax, bin_size):
-    n_bins = int((tmax - tmin) / bin_size)
-    bins = np.linspace(tmin, tmax, n_bins + 1)
-    counts, bin_edges = np.histogram(spike_time, bins=bins)
-    psth = counts / (len(stimuli) * bin_size)
-    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
-    return psth, bin_centers
+baselines = psths[psths.time<0].groupby("unit_id").spike_count.mean()
+baselines
 ```
 :::
 
 :::{#exr-}
-Complete the `plot_psth` function below by creating the `plt.bar` plot.
-```{python}
-def plot_psth(psth, bin_centers):
-    bin_size = bin_centers[1] - bin_centers[0]
-    plt.bar( # your code here
-    plt.axvline(x=0, ymin=0, ymax=1, linestyle="--", color="black")
-    plt.axvline(x=0.25, ymin=0, ymax=1, linestyle="--", color="black")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Firing Rate [Hz]")
-```
+Use `.map()` to map the baselines to the `psths` based on `"unit_id"` and write the result to a new column in `psths` called `"baseline"`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-def plot_psth(psth, bin_centers):
-    bin_size = bin_centers[1] - bin_centers[0]
-    plt.bar(bin_centers, psth, width=bin_size)
-    plt.axvline(x=0, ymin=0, ymax=1, linestyle="--", color="black")
-    plt.axvline(x=0.25, ymin=0, ymax=1, linestyle="--", color="black")
-    plt.xlabel("Time [s]")
-    plt.ylabel("Firing Rate [Hz]")
+psths["baseline"] = psths.unit_id.map(baselines)
 ```
 :::
 
 :::{#exr-}
-Run the cell below to use the newly created functions `compute_psth` and `plot_psth` to plot the PSTH for unit `951035143` between **-0.5 and 0.5 s** with a `bin_size` of **10 ms**
-```{python}
-spike_time = spikes[spikes["unit_id"] == 951035143]["spike_time"]
-psth, bin_centers = compute_psth(spike_time, tmin=-0.5, tmax=0.5, bin_size=0.01)
-plot_psth(psth, bin_centers)
-```
+Subtract the `"baseline"` from the `"spike_count"` and write the result to a new column called `"baselined_spike_count"`.
 :::
-
-## Applying a Baseline to the PSTH
-
-:::{#exm-}
-Compute the PSTH for unit `951026700` and calculate the average firing rate within the `baseline` period from **-0.5 to 0 s**.
+:::{.sol}
 ```{python}
-spike_time = spikes[spikes["unit_id"] == 951026700]["spike_time"]
-psth, bin_centers = compute_psth(spike_time, tmin=-0.5, tmax=0.5, bin_size=0.01)
-
-baseline = (-0.5, 0)
-baseline_start = np.argmin(np.abs(bin_centers - baseline[0]))
-baseline_stop = np.argmin(np.abs(bin_centers - baseline[1]))
-baseline_mean = psth[baseline_start:baseline_stop].mean()
+psths["baselined_spike_count"] = psths.spike_count - psths.baseline
 ```
 :::
 
 :::{#exr-}
-Plot the `psth` using the `plot_psth` function with and without subtracting the `baseline_mean`.
+Create an `sns.lineplot` of the `"baselined_spike_count"` across `"time"`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-plot_psth(psth, bin_centers)
-plt.figure()
-psth -= baseline_mean
-plot_psth(psth, bin_centers)
-```
-:::
-
-:::{#exr-}
-Compute and plot the PSTH for unit `951026700` between **-0.2 and 0.4 s** with a `bin_size` of **10 ms** and apply a baseline correction using the period from **-0.2 to 0 s**.
-:::
-:::{sol.}
-```{python}
-spike_time = spikes[spikes["unit_id"] == 951031253]["spike_time"]
-psth, bin_centers = compute_psth(spike_time, tmin=-0.2, tmax=0.4, bin_size=0.01)
-
-baseline = (-0.2, 0)
-baseline_start = np.argmin(np.abs(bin_centers - baseline[0]))
-baseline_stop = np.argmin(np.abs(bin_centers - baseline[1]))
-baseline_mean = psth[baseline_start:baseline_stop].mean()
-
-plot_psth(psth - baseline_mean, bin_centers)
+sns.lineplot(psths, x="time", y="baselined_spike_count")
 ```
 :::
 
 
 :::{#exr-}
-Compute and plot the PSTH for unit `951026481` between **-0.3 and 0.5 s** and use the time interval between **-0.3 and -0.15 s** to compute the baseline. Plot the PSTH with and without baseline correction. Do you think this baseline interval was a good choice?
+Add a `hue` to the lineplot that encodes the `"brain_area"` and limit the x-axis to the range from `0` to `0.5` seconds.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-spike_time = spikes[spikes["unit_id"] == 951026481]["spike_time"]
-psth, bin_centers = compute_psth(spike_time, tmin=-0.3, tmax=0.5, bin_size=0.01)
-
-baseline = (-0.3, -0.15)
-baseline_start = np.argmin(np.abs(bin_centers - baseline[0]))
-baseline_stop = np.argmin(np.abs(bin_centers - baseline[1]))
-baseline_mean = psth[baseline_start:baseline_stop].mean()
-
-plot_psth(psth, bin_centers)
-plt.figure()
-plot_psth(psth - baseline_mean, bin_centers)
-```
-:::
-
-## Computing PSTHs for Neural Populations
-
-:::{#exm-}
-Select the spike times from all units in the primary visual cortex `"V1"` and get the number of units recorded in that area.
-```{python}
-area = "V1"
-spike_time = spikes[spikes["brain_area"] == area]["spike_time"]
-n_units = len(spikes[spikes["brain_area"] == area]["unit_id"].unique())
+sns.lineplot(psths, x="time", y="baselined_spike_count", hue="brain_area")
+plt.xlim(0, 0.5)
 ```
 :::
 
 :::{#exr-}
-Compute and plot the PSTH for primary visual cortex between **-0.5 and 0.5 s** with a `bin_size` of **5 ms** and use the period between **0.5 and 0 s** as a baseline period. Divide the PSTh by `n_units` to normalize for the number of units recorded in V1.
+Set `estimator=None` and `units="unit_id"` to plot every unit individually.
 :::
-:::{#sol.}
 ```{python}
-psth, bin_centers = compute_psth(spike_time, tmin=-0.5, tmax=0.5, bin_size=0.005)
+sns.lineplot(psths, x="time", y="baselined_spike_count", hue="brain_area", estimator=None, units="unit_id")
+plt.xlim(0, 0.5)
+```
 
-baseline = (-0.5, 0)
-baseline_start = np.argmin(np.abs(bin_centers - baseline[0]))
-baseline_stop = np.argmin(np.abs(bin_centers - baseline[1]))
-baseline_mean = psth[baseline_start:baseline_stop].mean()
 
-psth = (psth - baseline_mean) / n_units
+## Identifying Responsive Units
 
-plot_psth(psth, bin_centers)
+
+:::{#exr-}
+Compute the spike count relative to the baseline by subtracting the `"baseline"` from the `"spike_count"` and dividing the result by the `"baseline"`.
+:::
+:::{.sol}
+```{python}
+psths["relative_spiking"] = (psths.spike_count - psths.baseline) / psths.baseline
+psths
+```
+:::
+
+:::{#exr-line}
+Create a `sns.lineplot` with `estimator=None` and `units="unit_id"` to plot the `"relative_spiking"` for every unit. Limit the x-axis to the range between `0` and `0.5` seconds.
+:::
+:::{.sol}
+```{python}
+sns.lineplot(
+    psths,
+    x="time",
+    y="relative_spiking",
+    hue="brain_area",
+    units="unit_id",
+    estimator=None,
+)
+plt.xlim(0, 0.5)
 ```
 :::
 
 :::{#exr-}
-Plot the same PSTH for the anterolateral visual cortex `"AL"` and the posteriomedial visual cortex `"PM"`. Compare the absolute firing rates between the areas. What could be a problem with computing the population activity with this approach?
+Compute the spike count relative to the baseline by subtracting the `"baseline"` from the `"spike_count"` and dividing the result by the `"baseline"` + the parameter `epsilon` defined below. This avoids distorting the responses of neurons with baselines close to 0. Overwrite the `"relative_spiking"` columns with the new values
 :::
-:::{sol.}
 ```{python}
-area = "PM"
-spike_time = spikes[spikes["brain_area"] == area]["spike_time"]
-n_units = len(spikes[spikes["brain_area"] == area]["unit_id"].unique())
-
-psth, bin_centers = compute_psth(spike_time, tmin=-0.5, tmax=0.5, bin_size=0.005)
-
-baseline = (-0.5, 0)
-baseline_start = np.argmin(np.abs(bin_centers - baseline[0]))
-baseline_stop = np.argmin(np.abs(bin_centers - baseline[1]))
-baseline_mean = psth[baseline_start:baseline_stop].mean()
-
-psth = (psth - baseline_mean) / n_units
-
-plot_psth(psth, bin_centers)
+epsilon = 0.2
+```
+:::{.sol}
+```{python}
+psths["relative_spiking"] = (psths.spike_count - psths.baseline) / (
+    psths.baseline + epsilon
+)
+psths
 ```
 :::
 
-## Identifying Neurons that Respond to the Stimulus
+:::{#exr-}
+Re-create the plot from @exr-line with the new `"relative_spiking"` values.
+:::
+```{python}
+sns.lineplot(
+    psths,
+    x="time",
+    y="relative_spiking",
+    hue="brain_area",
+    units="unit_id",
+    estimator=None,
+)
+plt.xlim(0, 0.5)
+```
+
+:::{#exr-}
+Increase the value of `epsilion`, then re-compute the the values of the `"relative_spiking"` and plot them to see the effect of the regularization parameter.
+:::
+:::{.sol}
+```{python}
+epsilon = 1
+psths["relative_spiking"] = (psths.spike_count - psths.baseline) / (
+    psths.baseline + epsilon
+)
+psths
+sns.lineplot(
+    psths,
+    x="time",
+    y="relative_spiking",
+    hue="brain_area",
+    units="unit_id",
+    estimator=None,
+)
+plt.xlim(0, 0.5)
+```
+:::
+
+:::{#exr-}
+Group the PSTHs by the `"unit_id"` and compute the `.max()` of the `"relative_spiking"` for each unit. Plot them in a histogram and draw a `plt.axvline` at the `threshold`.
+:::
+```{python}
+threshold = 1.5
+```
+```{python}
+sns.histplot(psths.groupby("unit_id").relative_spiking.max())
+plt.axvline(x=threshold, ymin=0, ymax=1, color="red")
+```
+
+:::{#exm-resp}
+Select the PSTHs of all units where the maximum `"relative_spiking"` exceeds the threshold and assign them to a new data frame called `psths_responsive`.
+:::
+```{python}
+is_responsive = psths.groupby("unit_id").relative_spiking.max() > threshold
+responsive_units = is_responsive[is_responsive].index
+psths_responsive = psths[psths.unit_id.isin(responsive_units)]
+```
+
+:::{#exr-}
+Create a `sns.lineplot` of the `"baselined_spike_count"` across `"time"` for the responsive units and add a `hue` to encode the `"brain_area"`.
+:::
+:::{.sol}
+```{python}
+sns.lineplot(psths_responsive, x="time", y="baselined_spike_count", hue="brain_area")
+plt.xlim(0, 0.5)
+```
+:::
+
+:::{#exr-}
+Increase the `threshold` and re-compute the `psths_responsive` as shown in @exm-resp. Then re-create the plot of the responsive unit's`"baselined_spike_count"` to see the effect of the increased threshold.
+:::
+
+## Estimating peak latency
 
 | Code | Description |
 | --- | --- |
-| `wilcoxon(x, y)` | Test the null hypothesis that `x` and `y` come from the same distribution|
-| `wilcoxon(x, y, alternative="greater")` | Test the null hypothesis that `x` and `y` come from the same distribution against the null hypothesis that the mean of `x` is `"greater"` |
-| `wilcoxon(x, y, alternative="less")` | Test the null hypothesis that `x` and `y` come from the same distribution against the null hypothesis that the mean of `x` is `"less"` |
-
----
+| `df.groupby("col1").col2.idxmax()` | Group `df` by `"col1"` and get the index of the maximum value in `"col2"` for each grouping |
+| `df.loc[indices, "col2"]` | Get the values of `"col2"` at the `indices` |
+| `df.loc[indices, "col2"].tolist()` | Get the values of `"col2"` at the `indices` and export them to a list |
 
 :::{#exm-}
-Compute the PSTH for unit `951026700` and perform a Wilcoxon signed rank-sum test to test whether the firing rate after the stimulus `x` is `"greater"` than the firing rate before the stimulus `y`.
+Filter the PSTHs of all responsive units in the time interval between `tmin` and `tmax`. Then, them by `"unit_id"` and `"brain_area"` and get the index of the maximum `"baselined_spike_count"`. Finally, use `.reset_index()` to create a new data frame `peaks` with columns `"unit_id"`, `"brain_area"` and `"max_idx"`.
+:::
 ```{python}
-spike_time = spikes[spikes["unit_id"] == 951026700]["spike_time"]
-psth, bin_centers = compute_psth(spike_time, tmin=-0.2, tmax=0.2, bin_size=0.01)
-wilcoxon(x=psth[bin_centers > 0], y=psth[bin_centers < 0], alternative="greater")
+tmin = 0.02
+tmax = 0.1
+mask = (psths_responsive.time > tmin) & (psths_responsive.time < tmax)
+peaks = (
+    psths_responsive[mask]
+    .groupby(["unit_id", "brain_area"])
+    .baselined_spike_count.idxmax()
+)
+peaks = peaks.reset_index()
+peaks.columns = ["unit_id", "brain_area", "max_idx"]
+peaks
+```
+
+:::{#exr-}
+Use `.loc[]` to get the `"time"` of the PSTHs at the index stored in `peak.max_idx` and export them `.tolist()`. Store these values in a new column of `peaks` called `"latency"`.
+:::
+:::{.sol}
+```{python}
+peaks["latency"] = psths_responsive.loc[peaks.max_idx, "time"].tolist()
+peaks
 ```
 :::
 
 :::{#exr-}
-Perform a Wilcoxon signed rank-sum test to test whether the firing rate of unit `951026700` after the stimulus is `"less"` than the firing rate before the stimulus.
+Create a `sns.kdeplot` with `common_norm=False` for the peak `"latency"` and add a `hue` to encode the `"brain_area"`. What new information does this graph reveal compared to the average PSTHs per brain area?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-wilcoxon(x=psth[bin_centers > 0], y=psth[bin_centers < 0], alternative="less")
+sns.kdeplot(peaks, x="latency", hue="brain_area", common_norm=False)
 ```
 :::
 
 :::{#exr-}
-Perform a Wilcoxon signed rank-sum test to test whether the firing rate of unit `951035143` after the stimulus is `"greater"` than the firing rate before the stimulus.
+Change `tmin` and `tmax` to extract the time interval after the stimulus offset which happens at `0.25` seconds. Then, get the peak latencies for each unit and visualize the distribution of peak latency across areas in a `sns.kdeplot`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-spike_time = spikes[spikes["unit_id"] == 951026700]["spike_time"]
-psth, bin_centers = compute_psth(spike_time, tmin=-0.2, tmax=0.2, bin_size=0.01)
-wilcoxon(x=psth[bin_centers > 0], y=psth[bin_centers < 0], alternative="greater")
+tmin = 0.25
+tmax = 0.35
+mask = (psths_responsive.time > tmin) & (psths_responsive.time < tmax)
+peaks = (
+    psths_responsive[mask]
+    .groupby(["unit_id", "brain_area"])
+    .baselined_spike_count.idxmax()
+)
+peaks = peaks.reset_index()
+peaks.columns = ["unit_id", "brain_area", "max_idx"]
+peaks["latency"] = psths_responsive.loc[peaks.max_idx, "time"].tolist()
+sns.kdeplot(peaks, x="latency", hue="brain_area", common_norm=False)
 ```
 :::
-
-:::{#exr-}
-Complete the `for` loop below which computes the PSTH for every unit in the posteriomedial visual cortex `"PM"` and adds them to the list of `psths` if the response after the stimulus is significantly higher than the response before the stimulus.
-```{python}
-#| eval: false
-spikes_v1 = spikes[spikes["brain_area"] == "PM"]
-psths = []
-for unit_id in spikes_v1["unit_id"].unique():
-    spike_time = spikes[spikes["unit_id"] == unit_id]["spike_time"]
-    psth, bin_centers = compute_psth(spike_time, tmin=-0.25, tmax=0.25, bin_size=0.01)
-    z, p = wilcoxon( # your code here )
-    if p < 0.05:
-        psths.append(psth)
-```
-:::
-:::{sol.}
-```{python}
-spikes_v1 = spikes[spikes["brain_area"] == "PM"]
-psths = []
-for unit_id in spikes_v1["unit_id"].unique():
-    spike_time = spikes[spikes["unit_id"] == unit_id]["spike_time"]
-    psth, bin_centers = compute_psth(spike_time, tmin=-0.25, tmax=0.25, bin_size=0.01)
-    z, p = wilcoxon(
-        x=psth[bin_centers > 0], y=psth[bin_centers < 0], alternative="greater"
-    )
-    if p < 0.05:
-        psths.append(psth)
-psth = np.mean(psths, axis=0)
-plot_psth(psth, bin_centers)
-```
-:::
-

@@ -1,0 +1,781 @@
+---
+title: "Estimating and Modeling Receptive Field Maps"
+engine: Jupyter
+format: ipynb
+filters:
+    - assign
+number-sections: true
+number-depth: 2
+---
+
+## Preparation
+
+Import the modules required for this notebook
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+import pandas as pd
+from matplotlib.patches import Ellipse
+from scipy.ndimage import gaussian_filter
+from scipy.optimize import curve_fit
+import scipy.ndimage as ndi
+from scipy import stats
+import seaborn as sns
+```
+
+Download the data required for this notebook
+```{python}
+# | eval: false
+import requests
+
+url = "https://uni-bonn.sciebo.de/s/Smx83PH5Wgf7mDe"
+fname = "gabor_spikes.parquet"
+response = requests.get(f"{url}/download")
+print("Downloading Data ...")
+with open(fname, "wb") as file:
+    file.write(response.content)
+print("Done!")
+```
+
+Define the functions required for this notebook
+```{python}
+# | code-fold: true
+class utils:
+    def gaussian_2d(xy, b, x0, y0, s_x, s_y, a):
+        x, y = xy
+        gaussian = (
+            b * np.exp(-((x - x0) ** 2 / (2 * s_x**2) + (y - y0) ** 2 / (2 * s_y**2)))
+            + a
+        )
+        return gaussian
+
+    def fit_gaussian_2d(rf):
+
+        rf[:] = ndi.gaussian_filter(rf, sigma=1)
+        x = rf.columns.astype(float).values
+        y = rf.index.astype(float).values
+        Z = rf.values
+        X, Y = np.meshgrid(x, y)
+        xy = np.vstack((X.ravel(), Y.ravel()))  # shape = (2, N)
+        z = Z.ravel()
+        # initia guesses
+        max_w = 80
+        lb = [0, x.min(), y.min(), 1e-2, 1e-2, -np.inf]
+        ub = [np.inf, x.max(), y.max(), max_w, max_w, np.inf]
+
+        # simple initial guess:
+        if z.sum() <= 0:  # no signal (all zeros or negative)
+            idx = np.argmax(z)
+            yi, xi = np.unravel_index(idx, rf.shape)
+            x0 = X[yi, xi]  # peak in x
+            y0 = Y[yi, xi]  # peak in y
+        else:
+            x0 = np.sum(X * rf.values) / z.sum()  # center-of-mass in x
+            y0 = np.sum(Y * rf.values) / z.sum()  # center-of-mass in y
+        b0 = z.max() - z.min()  # amplitude
+        a0 = z.min()  # offset (baseline)
+        s0 = max((x.ptp(), y.ptp())) / 4.0  # rough width
+        p0 = [b0, x0, y0, s0, s0, a0]
+
+        popt, pcov = curve_fit(utils.gaussian_2d, xy, z, p0=p0, bounds=(lb, ub))
+        return popt, xy
+
+    def r_squared(y, y_fit):
+        y = y.to_numpy().flatten()
+        y_fit = y_fit.flatten()
+        ss_res = np.sum((y - y_fit) ** 2)
+        ss_tot = np.sum((y - np.mean(y_fit)) ** 2)
+        r2 = 1 - (ss_res / ss_tot)
+        if r2 < 0:
+            r2 = 0
+        return r2
+
+    def get_rf_outline(popt, sigma=1):
+        x0, y0, sigma_x, sigma_y = popt[1:5]
+        theta = np.linspace(0, 2 * np.pi, 100)
+        x = x0 + sigma * sigma_x * np.cos(theta)
+        y = y0 + sigma * sigma_y * np.sin(theta)
+        return x, y
+
+```
+
+## Computing and Visualizing Receptive Field Maps
+
+Many sensory systems, such as vision, somatosensation and audition exhibit perceptual maps where neurons respond to specific regions of the perceptual space - in vision this is literally the patch of the visual field; in audition it’s a band of frequencies; in somatosensation it’s a patch of skin. The fraction of perceptual space to which a neuron responds is the neuron's receptive field. One can map a neuron's receptive field by recordings its responses while sampling the perceptual space. In this section, we are going to explore how to compute receptive field maps for visual neurons. We are going to use recordings from a mouse that was presented with gabor patches - simple visual gratings, presented at a specific location with a specific orientation. By counting the number of spikes elicited by a Gabor patch at every position, we can estimate a receptive field map that reveals the patch of the visual field the neurons responds to.
+
+| Code | Description |
+| --- | --- |
+| `df = pdf.read_parquet(mydata.parquet)` | Read the file `"mydata.parquet"` into a data frame `df` |
+| `df["col1"].unique()` | Get the `.unique()` values in column `"col1"` |
+| `df.groupby(["col1", "col2"]).size().unstack()` | Group `df` by `"col1"` and `"col2"`, get the number of rows for each grouping and pivot the table so that the inner most index becomes a new set of columns |
+| `sns.heatmap(df)` | Plot the data frame `df` as a heatmap |
+| `sns.heatmap(df, cmap="jet")` | Plot a heatmap of `df` using the `"jet"` colormap | 
+| `ndi.zoom(x, zoom=5)` | Upscale the image `x` by a factor of `5` |
+| `ndi.gaussian_filter(x, sigma=1)` | Apply a `gaussian_filter` with standard deviation `sigma=1` to the image `x` |
+
+---
+
+:::{#exr-}
+Load the data stored in `"gabor_spikes.parquet"` into a pandas data frame. 
+:::
+:::{.sol}
+```{python}
+df = pd.read_parquet("gabor_spikes.parquet")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+What are the different values for `"x_position"`, `"y_position"` and `"orientation"` in the data?
+:::
+:::{.sol}
+```{python}
+df["x_position"].unique(), df["y_position"].unique(), df["orientation"].unique()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exm-}
+Compute the average receptive field map `rf` for the whole recording by grouping the data by `"x_position"` and `"y_position"`, getting the `.size()` an `.unstack()`ing the result to get a 2D grid.
+:::
+```{python}
+rf = df.groupby(["y_position", "x_position"]).size().unstack()
+rf
+```
+
+:::{#exr-}
+Plot the receptive field `rf` with `sns.heatmap`.
+:::
+:::{.sol}
+```{python}
+sns.heatmap(rf)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the receptive field map for unit `951028431`.
+:::
+:::{.sol}
+```{python}
+unit = 951028431
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+sns.heatmap(rf)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the receptive field map for unit `951027930`.
+:::
+:::{.sol}
+```{python}
+unit = 951027930
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+sns.heatmap(rf)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exm-smooth}
+Use `ndi.zoom` to upscale the receptive field map by a factor of `zoom=5` and then use `ndi.gaussian_filter` to smooth the image.
+:::
+```{python}
+rf_interp = ndi.gaussian_filter(ndi.zoom(rf, zoom=5), sigma=5)
+sns.heatmap(rf_interp)
+```
+
+:::{#exr-}
+Re-create the plot above with `sigma=5`.
+:::
+:::{.sol}
+```{python}
+rf_interp = ndi.gaussian_filter(ndi.zoom(rf, zoom=5), sigma=5)
+sns.heatmap(rf_interp)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+
+:::{#exr-}
+Re-create the plot above with `zoom=10` and `sigma=10`. What are the advantages and downsides of applying upscaling and smoothing?
+:::
+:::{.sol}
+```{python}
+rf_interp = ndi.gaussian_filter(ndi.zoom(rf, zoom=10), sigma=10)
+sns.heatmap(rf_interp)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Re-create the heatmap plot of the interpolated image but add the `cmap` argument. Try the values `"viridis"`, `"Greys"` and `"jet"`. Which of these is a good colormap choice for a receptive field plot?
+:::
+:::{.sol}
+```{python}
+for cmap in ["viridis", "Greys", "jet"]:
+    plt.figure()
+    sns.heatmap(rf_interp, cmap=cmap)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+## Visualizing Receptive Fields Across Brain Areas
+
+Now we know how to compute and visualize receptive field maps. However, modern multi-electrode recordings contain lots of neurons such that plotting and inspecting them individually is not feasible. Fortunately, seaborn provides the `FacetGrid` class for generating multi-plot grids which allows us to quickly visualize and compare large numbers of neurons. When instantiating a `FacetGrid`, we provide a data frame and the categories that make up th rows and columns of our plot. We then map a function to the data frame that performs some plotting operation and seaborn will automatically determine the correct location of the plot.
+
+| Code | Description |
+| --- | --- |
+| `def fun(data, *args, **kwargs)` | Define a function `fun` that takes an argument `data` as well as an arbitrary number of positional `*args` and keyword arguments `**kwargs` |
+| `g = sns.FacetGrid(data=df, col="col1")` | Create a multi-plot grid for the data frame `df` with one column for each unique value in `"col1"` |
+| `g = sns.FacetGrid(data=df, col="col1")` | Create a multi-plot grid with one column for each unique value in `"col1"` and start a new row every `3` plots |
+| `g = sns.FacetGrid(data=df, col="col1", row="col2")` | Create a multi-plot grid with one column for each unique value in `"col1"` and one row for each value in `"col2"` |
+| `g.map_dataframe(fun)` | Map the function `fun` to the data frame associated with the multi-plot grid `g` |
+| `units = df[df.col1 == "a"]` | Get all rows in `df` where the value `"col1"` is `"a"` |
+| `units = df[df.col1.isin(x)]` | Get all rows in `df` where the value of `"col1"` is in the list `x` |
+
+---
+
+:::{#exm-rfs}
+Create a multi-plot grid where each column represents one `"brain_area"`, then define a function `fun` that takes in a data frame `data`, computes the receptive field map and plots it and map that function to the grid to plot the average rf for every brain area.
+:::
+```{python}
+def fun(data, *args, **kwargs):
+    rf = data.groupby(["y_position", "x_position"]).size().unstack()
+    sns.heatmap(rf)
+
+
+g = sns.FacetGrid(data=df, col="brain_area")
+g.map_dataframe(fun)
+```
+
+:::{#exr-}
+Create a multi-plot grid where each `row` represents one `"brain_area"` and each column represents one `"orientation"`. Then, map the function `fun` to the grid to draw the average receptive field map for every brain area and every stimulus orientation.
+:::
+:::{.sol}
+```{python}
+g = sns.FacetGrid(data=df, row='brain_area', col='orientation')
+g.map_dataframe(fun)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+The code below selects the first `9` unique `units` in the primary visual cortex `"V1"`. Plot their receptive field maps with `col="unit_id"` and set `col_wrap=3` to create a new row every `3` plots. How many units show a clearly visible receptive field?
+:::
+```{python}
+units = df[df.brain_area == "V1"].unit_id.unique()[:9]
+units = df[df.unit_id.isin(units)]
+units
+```
+:::{.sol}
+```{python}
+g = sns.FacetGrid(data=units, col="unit_id", col_wrap=3)
+g.map_dataframe(fun)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the first `9` unique `unit` in the anterolateral area `"AL"`. How do these receptive field maps look compared to the ones from `"V1"`?
+:::
+:::{.sol}
+```{python}
+units = df[df.brain_area == "AL"].unit_id.unique()[:9]
+units = df[df.unit_id.isin(units)]
+units
+g = sns.FacetGrid(data=units, col="unit_id", col_wrap=3)
+g.map_dataframe(fun)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+The code below samples `5` random `units` from every `"brain_area"` and assigns a `"unit_rank"` to each unit per areas. Plot the receptive field maps of the `units` with a `row` for every `"unit_rank"` and a `col` for every `"brain_area"` (HINT: since the sampling is random, you'll get a different plot everytime you run the cell below).
+:::
+```{python}
+units = df[["brain_area", "unit_id"]].drop_duplicates().groupby("brain_area").sample(5)
+units["unit_rank"] = units.groupby("brain_area").cumcount()
+del units["brain_area"]
+units = df.merge(units, on="unit_id")
+units
+```
+:::{.sol}
+```{python}
+g = sns.FacetGrid(data=units, row="unit_rank", col="brain_area")
+g.map_dataframe(fun)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Modify the plotting fuction `fun` to use `cmap="Greys"` and re-create the plot with the average receptive field map per area from @exm-rfs.
+:::
+:::{.sol}
+```{python}
+g = sns.FacetGrid(data=df, col="brain_area")
+fun = lambda data, *args, **kwargs: sns.heatmap(
+    data.groupby(["y_position", "x_position"]).size().unstack(), cmap="Greys"
+)
+g.map_dataframe(fun)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+(BONUS): modify the function `fun` to upscale and smooth the receptive field maps as shown in @exm-smooth. Then, re-create the plot with the average receptive field map per area.
+:::
+:::{.sol}
+```{python}
+g = sns.FacetGrid(data=df, col="brain_area")
+fun = lambda data, *args, **kwargs: sns.heatmap(
+    ndi.gaussian_filter(
+        ndi.zoom(data.groupby(["y_position", "x_position"]).size().unstack(), zoom=5),
+        sigma=5,
+    )
+)
+g.map_dataframe(fun)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+## Fitting Gaussian Models to Receptive Field Maps
+
+In the previous section we saw that some neurons have a receptive field with a sharply localized peak while others are more spread out. Visualizing receptive field maps is a great way for getting an idea about the trends in our data but a systematic analysis and comparison of receptive fields requires us to parameterize their properties. In this section, we are going to learn how to fit a model to the receptive field map and use this model to determine the outline of the receptive field.
+For this we are going to use a 2-dimensional Gaussian of the form:
+
+$$
+b \exp\left(-\left[\frac{(x - \mu_x)^2}{2\sigma_x^2} + \frac{(y - \mu_y)^2}{2\sigma_y^2}\right]\right)
+$$
+
+Which is a simple model that has a very clear interpretation because the standard deviation parameters $\sigma_x$ and $\sigma_y$ represent the width and height of the receptive field and the receptive field area is given by $\pi \sigma_x \sigma_y$.
+
+| Code | Description |
+| --- | --- |
+| `popt, xy = utils.fit_gaussian_2d(rf)` | Fit a 2D Gaussian to the receptive field `rf` and return the optimal parameters `popt` and the grid of coordinates `xy` |
+| `rf_fit = utils.gaussian_2d(xy, *popt).reshape(rf.shape)` | Generate `rf_fit` as a 2D Gaussian with the coordinate grid `xy` and the optimized parameters `*popt` and `.reshape()` it to the shape of `rf` |
+| `utils.r_squared(rf, rf_fit)` | Compute the coefficient of determination R^2 for `rf` and `rf_fit` |
+| `sigma_x, sigma_y = popt[3:5]` | Get the standard deviation in x and y, `sigma_x` and `sigma_y`, from the optimal parameters od the 2D Gaussian |
+| `x, y = utils.get_rf_outline(popt)` | Get the `x` and `y` coordinates that form the outline of the Gaussian fot of the receptive field |
+| `plt.plot(x, y, color="black")` | Plot the points with coordinates `x` and `y` and connect them with `"black"` lines |
+| `plt.subplot(1, 2, 1)` | Create the first subplot in a 1 by 2 grid |
+| `plt.subplot(1, 2, 2)` | Create the seconds subplot in a 1 by 2 grid |
+| `plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")` | Plot the receptive field `rf` as an image that extends from `-45` to `45` in x and y and where the first row of `rf` is drawn at the `"lower"` end of the plot |
+
+---
+
+:::{#exm-}
+Compute the receptive field map for unit `951028431` and fit a 2-D Gaussian to it. Then, use the optimized parameters `popt` and the grid of coordinates `xy` to generate the fitted receptive field map `rf_fit` and compute the coefficient of determination using `utils.r_squared()`.
+:::
+```{python}
+unit = 951028431
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+rf_fit = utils.gaussian_2d(xy, *popt).reshape(rf.shape)
+utils.r_squared(rf, rf_fit)
+```
+
+:::{#exm-}
+Plot the estimated receptive field map `rf` next to the map predicted from the Gaussian model `rf_fit`.
+:::
+```{python}
+plt.subplot(1, 2, 1)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.subplot(1, 2, 2)
+plt.imshow(rf_fit, extent=[-45, 45, -45, 45], origin="lower")
+```
+
+:::{#exr-}
+Compute the receptive field map for unit `951035530` and fit a 2-D Gaussian to it. Then, use the optimized parameters `popt` and the grid of coordinates `xy` to generate the fitted receptive field map `rf_fit` and compute the coefficient of determination using `utils.r_squared()`.
+:::
+:::{.sol}
+```{python}
+unit = 951035530
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+rf_fit = utils.gaussian_2d(xy, *popt).reshape(rf.shape)
+utils.r_squared(rf, rf_fit)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the estimated receptive field map `rf` next to the map predicted from the Gaussian model `rf_fit`.
+:::
+:::{.sol}
+```{python}
+plt.subplot(1, 2, 1)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.subplot(1, 2, 2)
+plt.imshow(rf_fit, extent=[-45, 45, -45, 45], origin="lower")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Compute the receptive field map for unit `951031429`, fit a 2-D Gaussian and compute `utils.r_squared()`. What does the value of $R^2$ tell you about how well the model fits the data?
+:::
+:::{.sol}
+```{python}
+unit = 951031429
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+rf_fit = utils.gaussian_2d(xy, *popt).reshape(rf.shape)
+utils.r_squared(rf, rf_fit)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the estimated receptive field map `rf` next to the map predicted from the Gaussian model `rf_fit`. Do you think a 2D Gaussian is a good description of this data?
+:::
+:::{.sol}
+```{python}
+plt.subplot(1, 2, 1)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.subplot(1, 2, 2)
+plt.imshow(rf_fit, extent=[-45, 45, -45, 45], origin="lower")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Compute the receptive field map for unit `951031429`, fit a 2-D Gaussian and compute `utils.r_squared()`. Would you consider the model a good fit based on th evalue of $R^2$?
+:::
+:::{.sol}
+```{python}
+unit = 951027930
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+rf_fit = utils.gaussian_2d(xy, *popt).reshape(rf.shape)
+utils.r_squared(rf, rf_fit)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the estimated receptive field map `rf` next to the map predicted from the Gaussian model `rf_fit`. Do you think a 2D Gaussian is a good description of this data?
+:::
+:::{.sol}
+```{python}
+plt.subplot(1, 2, 1)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.subplot(1, 2, 2)
+plt.imshow(rf_fit, extent=[-45, 45, -45, 45], origin="lower")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exm-}
+Fit a model to the receptive field map of unit `951028431` and get width and height as the standard deviation of the 2D Gaussian in x (`sigma_x`) and y (`sigma_y`). Print the width, height and area of the receptive field.
+:::
+```{python}
+unit = 951028431
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+sigma_x, sigma_y = popt[3:5]
+
+print("RF width: ", np.abs(sigma_x), "degree")
+print("RF height: ", np.abs(sigma_y), "degree")
+print("RF area: ", np.pi * np.abs(sigma_x) * np.abs(sigma_y), "degree^2")
+```
+
+:::{#exm-}
+Get the x, y coordinates that for the outline of the receptive field model at `sigma=1` and plot it together with the receptive field map.
+:::
+```{python}
+x, y = utils.get_rf_outline(popt)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.plot(x, y, color="black")
+```
+
+:::{#exr-}
+Fit a model to the receptive field map of unit `951035530` and get width and height as the standard deviation of the 2D Gaussian in x (`sigma_x`) and y (`sigma_y`). Print the width, height and area of the receptive field.
+:::
+:::{.sol}
+```{python}
+unit = 951035530
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+sigma_x, sigma_y = popt[3:5]
+
+print("RF width: ", np.abs(sigma_x), "degree")
+print("RF height: ", np.abs(sigma_y), "degree")
+print("RF area: ", np.pi * np.abs(sigma_x) * np.abs(sigma_y), "degree^2")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Get the x, y coordinates that for the outline of the receptive field model at `sigma=1.5` and plot it together with the receptive field map.
+:::
+:::{.sol}
+```{python}
+x, y = utils.get_rf_outline(popt, sigma=1.5)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.plot(x, y, color="black")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Fit a model to the receptive field map of unit `951027930` and get width and height as the standard deviation of the 2D Gaussian in x (`sigma_x`) and y (`sigma_y`). Print the width,V height and area of the receptive field.
+:::
+:::{.sol}
+```{python}
+unit = 951027930
+rf = df[df.unit_id == unit].groupby(["y_position", "x_position"]).size().unstack()
+popt, xy = utils.fit_gaussian_2d(rf)
+sigma_x, sigma_y = popt[3:5]
+
+print("RF width: ", np.abs(sigma_x), "degree")
+print("RF height: ", np.abs(sigma_y), "degree")
+print("RF area: ", np.pi * np.abs(sigma_x) * np.abs(sigma_y), "degree^2")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Get the x, y coordinates that for the outline of the receptive field model at `sigma=2` (encompasses about 95% of the model's probability mass) and plot it together with the receptive field map. 
+:::
+:::{.sol}
+```{python}
+x, y = utils.get_rf_outline(popt, sigma=2)
+plt.imshow(rf, extent=[-45, 45, -45, 45], origin="lower")
+plt.plot(x, y, color="black")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+## Comparing Receptive Fields Across Visual Areas
+
+Now, we can use the 2D Gaussian to model every unit in our recording and use the estimated parameters to compare the receptive field fits and sizes across the different visual areas. We know that, as you ascend the hierarchy of the visual system, receptive fields do not only get larger but also become more complex. Thus, our simple 2D Gaussian may be a worse fit for the receptive fields in higher visual areas. To keep things simple, we can focus our analysis on those neurons that are well described by the Gaussian model (as indicated by a high value of $R^2$).
+
+| Code | Description |
+| --- | --- |
+| `df.groupby(["col1", "col2"]).size().unstack(fill_values=0)` | Group `df` by `"col1"` and `"col2"`, get the number of rows for each grouping and pivot the table so that the inner most index becomes a new set of columns. Fill the cells without any observations with the value `0`. |
+| `sns.histplot(df, x="col1")` | Create a histogram of the values in `"col1"` |
+|`sns.kdeplot(df, x="col1", hue="col2", common_norm=False)` | Plot the distribution of the values in `"col1"` for each unique value in `"col2"` and normalize the distribution separately |
+| `sns.barplot(df, x="col1", y="col2")` | Create a barplot with `"col1"` on the x-axis and `"col2"` on the y-axis |
+| `df["col3"] = df.col1 * df.col2` | Create a new column `"col3"` that is the product of the values in `"col1"` and `"col2"` |
+| `df[df.col1>x]` | Get all rows of `df` where the value of `"col1"` is greater than `x` |
+| `np.pi` | Get the value of $\pi$ |
+| `np.abs(x)` | Get the absolute values of `x` |
+
+The cell below defines the function `fit_one_unit()` that combines the analysis steps from the previous sections: it computes the receptive field map, fits a 2D gaussian and returns `r_squared` as well as `sigma_x` and `sigma_y`. This function is applied to every unit to obtain a table that contains the statistical properties of every neuron's receptive field. Run the code to generate the data frame `rf_stats` with the statistial properties of every neuron's receptive field.
+
+```{python}
+def fit_one_unit(df):
+    rf = df.groupby(["y_position", "x_position"]).size().unstack(fill_value=0)
+    popt, xy = utils.fit_gaussian_2d(rf)
+    rf_fit = utils.gaussian_2d(xy, *popt).reshape(rf.shape)
+    r_squared = utils.r_squared(rf, rf_fit)
+    sigma_x, sigma_y = popt[3:5]
+    return pd.Series(
+        [r_squared, sigma_x, sigma_y], index=["r_squared", "sigma_x", "sigma_y"]
+    )
+
+
+rf_stats = (
+    df.groupby(["brain_area", "unit_id"])
+    .apply(fit_one_unit, include_groups=False)
+    .reset_index()
+)
+rf_stats
+```
+
+:::{#exr-}
+Use `sns.histplot` to plot the distribution of `"r_squared"` values across all receptive field models.
+:::
+:::{.sol}
+```{python}
+sns.histplot(rf_stats, x="r_squared")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Use `sns.kdeplot` to plot the distribution of `"r_squared"` with a `hue` for `"brain_area"` and without applying a `common_norm`. For which brain area is the 2D Gaussian model of the neurons' receptive fields most accurate?
+:::
+:::{.sol}
+```{python}
+sns.kdeplot(rf_stats, x="r_squared", hue="brain_area", common_norm=False)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Calculate the receptive field areas as `np.pi * sigma_x * sigma_y` and assign them to a new column `"rf_area"`. Why do we have to take the absolute values of `sigma_x` and `sigma_y` ?
+:::
+:::{.sol}
+```{python}
+rf_stats["rf_area"] = np.pi * np.abs(rf_stats.sigma_x) * np.abs(rf_stats.sigma_y)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Use `sns.barplot` with `"brain_area"` on the `x` axis and `"rf_area"` on the `y` axis. In which area are the receptive fields the smallest?
+:::
+:::{.sol}
+```{python}
+sns.barplot(rf_stats, x="brain_area", y="rf_area")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Recreate the barplot but only include the receptive fields where the value of $R^2$ is above `0.8`. How does this affect the outcome?
+:::
+:::{.sol}
+```{python}
+sns.barplot(rf_stats[rf_stats.r_squared>0.8], x="brain_area", y="rf_area")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+

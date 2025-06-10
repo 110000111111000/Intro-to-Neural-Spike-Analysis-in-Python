@@ -41,6 +41,7 @@ Define the functions required for this notebook
 ```{python}
 # | code-fold: true
 class utils:
+    @staticmethod
     def gaussian_2d(xy, b, x0, y0, s_x, s_y, a):
         x, y = xy
         gaussian = (
@@ -49,6 +50,7 @@ class utils:
         )
         return gaussian
 
+    @staticmethod
     def fit_gaussian_2d(rf):
 
         rf[:] = ndi.gaussian_filter(rf, sigma=1)
@@ -80,6 +82,7 @@ class utils:
         popt, pcov = curve_fit(utils.gaussian_2d, xy, z, p0=p0, bounds=(lb, ub))
         return popt, xy
 
+    @staticmethod
     def r_squared(y, y_fit):
         y = y.to_numpy().flatten()
         y_fit = y_fit.flatten()
@@ -90,6 +93,7 @@ class utils:
             r2 = 0
         return r2
 
+    @staticmethod
     def get_rf_outline(popt, sigma=1):
         x0, y0, sigma_x, sigma_y = popt[1:5]
         theta = np.linspace(0, 2 * np.pi, 100)

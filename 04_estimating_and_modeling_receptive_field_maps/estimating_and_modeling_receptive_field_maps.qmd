@@ -15,11 +15,9 @@ Import the modules required for this notebook
 import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
-from matplotlib.patches import Ellipse
 from scipy.ndimage import gaussian_filter
 from scipy.optimize import curve_fit
 import scipy.ndimage as ndi
-from scipy import stats
 import seaborn as sns
 ```
 

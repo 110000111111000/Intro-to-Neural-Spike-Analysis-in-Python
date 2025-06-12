@@ -13,13 +13,13 @@ Download the data required for this session
 ```{python}
 import requests
 
-url = "https://uni-bonn.sciebo.de/s/aFQ1gcUbOHRDEtP/download"
+url = "https://uni-bonn.sciebo.de/s/aFQ1gcUbOHRDEtP"
 fname = "spike_waveforms.npy"
-
-if not os.path.exists(f"../data/{fname}"):
-    response = requests.get(url)
-    with open(f"../data/{fname}", "wb") as file:
-        file.write(response.content)
+response = requests.get(f"{url}/download")
+print("Downloading Data ...")
+with open(fname, "wb") as file:
+    file.write(response.content)
+print("Done!")
 ```
 
 ## Extraing Waveform Features with PCA
@@ -37,7 +37,7 @@ if not os.path.exists(f"../data/{fname}"):
 :::{#exr-}
 Load the array of of spike waveforms stored in `"../data/spike_waveforms.npy"`, assign it to a variable `waveforms` print its `.shape`. How many spikes are stored in the array?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 waveforms = np.load("../data/spike_waveforms.npy")
 waveforms.shape
@@ -46,17 +46,17 @@ waveforms.shape
 
 :::{#exm-}
 Use `PCA` with `n_components=5` to transform the spike waveforms recorded at the first channel.
+:::
 ```{python}
 X = waveforms[:, :, 0]
 pca = PCA(n_components=5)
 X_transformed = pca.fit_transform(X)
 ```
-:::
 
 :::{#exr-}
 Use `PCA` with `n_components=7` to transform the spike waveforms recorded at the first channel. Compare the `.shape` of the original and the transformed data.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 X = waveforms[:, :, 0]
 pca = PCA(n_components=7)
@@ -68,7 +68,7 @@ print(X.shape, X_transformed.shape)
 :::{#exr-}
 Use `PCA` with `n_components=15` to transform the spike waveforms recorded at the first channel. Compare the `.shape` of the original and the transformed data.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 X = waveforms[:, :, 0]
 pca = PCA(n_components=15)
@@ -80,15 +80,14 @@ print(X.shape, X_transformed.shape)
 :::{#exr-}
 What error message do you observe when you try to apply `PCA` with `n_components=40`?
 :::
-:::{sol.}
+:::{.sol}
 `ValueError: n_components=40 must be between 0 and min(n_samples,n_features)=30`
 :::
 
 :::{#exr-}
 Plot the ratio of variance explained by the PCA components (i.e. `pca.explained_variance_ratio_`)
 :::
-:::{sol.}
-
+:::{.sol}
 ```{python}
 plt.plot(pca.explained_variance_ratio_)
 ```
@@ -98,7 +97,7 @@ plt.plot(pca.explained_variance_ratio_)
 :::{#exr-}
 Compute the cumulative ratio of explained variance using `np.cumsum()` and plot it
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.plot(np.cumsum(pca.explained_variance_ratio_))
 ```
@@ -107,7 +106,7 @@ plt.plot(np.cumsum(pca.explained_variance_ratio_))
 :::{#exr-}
 What ratio of the variance is explained by the first three components (i.e. what is the `sum()` of the first three element of `.explained_varaince_ratio_`?) and how many components are required to account for over 99% of varaince?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 print(sum(pca.explained_variance_ratio_[:3]))
 print(sum(pca.explained_variance_ratio_[:8]))
@@ -117,7 +116,7 @@ print(sum(pca.explained_variance_ratio_[:8]))
 :::{#exr-}
 Fit a PCA with `n_components=15` to the waveforms recorded at the second channel, then compute and plot the PCA component's cumulative ratio of explained variance.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 X = waveforms[:, :, 1]
 pca = PCA(n_components=15)
@@ -136,7 +135,8 @@ plt.plot(np.cumsum(pca.explained_variance_ratio_))
 ---
 
 :::{#exm-}
-Compute a `PCA` with `n_components=3` for the waveforms recorded at the first channel and plot the first component, along with the first 100 recorded waveforms.
+Fit a `PCA` with `n_components=3` to the waveforms recorded at the first channel and plot the first component, along with the first 100 recorded waveforms.
+:::
 ```{python}
 X = waveforms[:, :, 0]
 pca = PCA(n_components=3)
@@ -146,12 +146,11 @@ plt.plot(X[:100].T, linewidth=0.5)
 plt.subplot(2, 1, 2)
 plt.plot(pca.components_[0])
 ```
-:::
 
 :::{#exr-}
 Plot the second and third principle component along with the first 100 waveforms recorded at the first channel.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.subplot(3, 1, 1)
 plt.plot(X[:100].T, linewidth=0.5)
@@ -163,9 +162,9 @@ plt.plot(pca.components_[2])
 :::
 
 :::{#exr-}
-Compute a `PCA` with `n_components=3` for the waveforms recorded at the third channel and plot the first component, along with the first 100 recorded waveforms.
+Fit a `PCA` with `n_components=3` to the waveforms recorded at the third channel and plot the first component, along with the first 100 recorded waveforms.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 X = waveforms[:, :, 2]
 pca = PCA(n_components=3)
@@ -179,6 +178,7 @@ plt.plot(pca.components_[0])
 
 :::{#exm-}
 Compute a `PCA` with `n_components=1` for the waveforms recorded at the first channel and transform the data. Then, compute the `.inverse_transfom()` of the transformed data and plot the result of the inverse transformation `X_inverse` along with the original data `X` for the first spike.
+:::
 ```{python}
 X = waveforms[:, :, 0]
 pca = PCA(n_components=1)
@@ -187,12 +187,11 @@ X_inverse = pca.inverse_transform(X_transformed)
 plt.plot(X[0])
 plt.plot(X_inverse[0])
 ```
-:::
 
 :::{#exr-}
 Plot the original data `X` and the result of the inverse transformation `X_inverse` for the 7th spike.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.plot(X[6])
 plt.plot(X_inverse[6])
@@ -200,30 +199,16 @@ plt.plot(X_inverse[6])
 :::
 
 :::{#exr-}
-Compute a `PCA` with `n_components=3` for the waveforms recorded at the first channel and transform the data. Then, compute the `.inverse_transfom()` of the transformed data and plot the result of the inverse transformation `X_inverse` along with the original data `X` for the first spike.
+Re-compute the `PCA` and increase the number of `n_components`, then `fit_transform` and `inverse_transform` the data. How many components do you need so the original data `X` and `X_inverse` become indistinguishable?
 :::
-:::{sol.}
-```{python}
-X = waveforms[:, :, 0]
-pca = PCA(n_components=3)
-X_transformed = pca.fit_transform(X)
-X_inverse = pca.inverse_transform(X_transformed)
-plt.plot(X[0])
-plt.plot(X_inverse[0])
-```
-:::
-
-:::{#exr-}
-How many `PCA` components are required so that the original waveform and the result of the inverse transformation become visually indistinguishable?
-:::
-:::{sol.}
+:::{.sol}
 ```{python}
 X = waveforms[:, :, 0]
 pca = PCA(n_components=9)
 X_transformed = pca.fit_transform(X)
 X_inverse = pca.inverse_transform(X_transformed)
-plt.plot(X[0])
-plt.plot(X_inverse[0])
+plt.plot(X[6])
+plt.plot(X_inverse[6])
 ```
 :::
 
@@ -240,10 +225,10 @@ waveforms_transformed = np.zeros((n_spikes, n_components, n_channels))
 
 for i_ch in range(n_channels):
     X = waveforms[:, :, i]
-    X_transformed =  
+    X_transformed = # your code here 
     waveforms_transformed[:, :, i_ch] = X_transformed
 ```
-:::{sol.}
+:::{.sol}
 ```{python}
 n_components = 3
 pca = PCA(n_components=n_components)
@@ -258,18 +243,18 @@ for i in range(n_channels):
 :::
 
 :::{#exm-pca}
-Plot the amplitude of the 1st PCA feature at **channel 1** against the amplitude at **channel 2** for all spikes.
+Plot the amplitude of the 1st PCA feature at the channel 1 against the amplitude at the channel 2 for all spikes (each spike is one dot).
+:::
 ```{python}
 plt.scatter(waveforms_transformed[:, 0, 0], waveforms_transformed[:, 0, 1], s=1)
 plt.xlabel("Ch 1 Amplitude [a.u.]")
 plt.ylabel("Ch 2 Amplitude [a.u.]")
 ```
-:::
 
 :::{#exr-}
-Plot the amplitude of the 1st PCA feature at **channel 1** against the amplitude at **channel 3** for all spikes. Can you visually identify clusters that the individual spikes may fall into?
+Plot the amplitude of the 1st PCA feature at channel 1 against the amplitude at channel 3 for all spikes. Can you visually identify clusters that the individual spikes may fall into?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.scatter(waveforms_transformed[:, 0, 0], waveforms_transformed[:, 0, 2], s=1)
 plt.xlabel("Ch 1 Amplitude [a.u.]")
@@ -278,9 +263,9 @@ plt.ylabel("Ch 2 Amplitude [a.u.]")
 :::
 
 :::{#exr-}
-Plot the amplitude of the 1st PCA feature at **channel 3** against the amplitude at **channel 4** for all spikes. Can you visually identify clusters that the individual spikes may fall into?
+Plot the amplitude of the 1st PCA feature at channel 3 against the amplitude at channel 4 for all spikes. Can you visually identify clusters that the individual spikes may fall into?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.scatter(waveforms_transformed[:, 0, 2], waveforms_transformed[:, 0, 3], s=1)
 plt.xlabel("Ch 1 Amplitude [a.u.]")
@@ -298,30 +283,30 @@ plt.ylabel("Ch 2 Amplitude [a.u.]")
 | `gmm.bic(X)` | Compute the Baysian Information Criterion `bic` of the fitted model `gmm` on the data `X` |
 
 :::{#exr-}
-Execute the cell below to `.reshape()` the 3-dimensional matrix `waveforms_transformed` into a 2-dimensional matrix `X` by concatenating the components and channels dimension. What is the `.shape` of `X`?
+Execute the cell below to `.reshape()` the 3-dimensional matrix `waveforms_transformed` into a 2-dimensional matrix `X` by concatenating the components and channels dimension. What is the new `.shape` of `X`?
+:::
 ```{python}
 X = waveforms_transformed.reshape(-1, n_components * n_channels, order="F")
 ```
-:::
-:::{sol.}
+:::{.sol}
 ```{python}
 X.shape
 ```
 :::
 
 :::{#exm-}
-Apply a `GaussianMixture` model with `n_components=5` to the first **1000** spikes in `waveforms` and compute the models `.score()` (i.e. the log likelihood).
+Apply a `GaussianMixture` model with `n_components=5` to the first `1000` spikes in `waveforms` and compute the models `.score()` (i.e. the log likelihood).
+:::
 ```{python}
 gmm = GaussianMixture(n_components=5)
 gmm.fit(X[:1000])
 gmm.score(X[:1000])
 ```
-:::
 
 :::{#exr-}
-Apply a `GaussianMixture` model with `n_components=10` to the first **1000** spikes in `waveforms` and compute the models `.score()`. Is this model more accurate than the model with `n_components=5`?
+Apply a `GaussianMixture` model with `n_components=10` to the first `1000` spikes in `waveforms` and compute the models `.score()`. Is this model more accurate than the model with `n_components=5`?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 gmm = GaussianMixture(n_components=10)
 gmm.fit(X[:1000])
@@ -331,9 +316,9 @@ gmm.score(X[:1000])
 
 
 :::{#exr-}
-Apply a `GaussianMixture` model with `n_components=100` to the first **1000** spikes in `waveforms` and compute the models `.score()`. Will the model's accuracy always increase with the number of components? What is the largest number of components possible for this model?
+Apply a `GaussianMixture` model with `n_components=100` to the first `1000` spikes in `waveforms` and compute the models `.score()`. Will the model's accuracy always increase with the number of components? What is the largest number of components possible for this model?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 gmm = GaussianMixture(n_components=100)
 gmm.fit(X[:1000])
@@ -343,9 +328,9 @@ The largest number of components is equal to the number of data points, i.e. 100
 :::
 
 :::{#exr-}
-Apply a `GaussianMixture` model with `n_components=10` to the first **1000** spikes in `waveforms` and compute the Bayesian Information Criterion `.bic()`.
+Apply a `GaussianMixture` model with `n_components=10` to the first `1000` spikes in `waveforms` and compute the Bayesian Information Criterion `.bic()`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 gmm = GaussianMixture(n_components=10)
 gmm.fit(X[:1000])
@@ -354,8 +339,9 @@ gmm.bic(X[:1000])
 :::
 
 :::{#exr-}
-Apply a `GaussianMixture` model with `n_components=5` to the first **1000** spikes in `waveforms` and compute the Bayesian Information Criterion `.bic()`. Does this model perform better or worse than the one with `n_components=10` according to the BIC (HINT: a lower BIC indicates a better model)?
+Apply a `GaussianMixture` model with `n_components=5` to the first `1000` spikes in `waveforms` and compute the Bayesian Information Criterion `.bic()`. Does this model perform better or worse than the one with `n_components=10` according to the BIC (HINT: a lower BIC indicates a better model)?
 :::
+:::{.sol}
 ```{python}
 gmm = GaussianMixture(n_components=5)
 gmm.fit(X[:1000])
@@ -364,9 +350,9 @@ gmm.bic(X[:1000])
 :::
 
 :::{#exr-}
-Increase the number of spikes the `GaussianMixture` model is fit on to **8000**. Which model performs better now, the one with 5 or 10 components?
+Increase the number of spikes the `GaussianMixture` model is fit on to `8000`. Which model performs better now, the one with 5 or 10 components?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 gmm = GaussianMixture(n_components=5)
 gmm.fit(X[:8000])
@@ -377,35 +363,17 @@ print(gmm.bic(X[:8000]))
 ```
 :::
 
-
 :::{#exr-}
-Complete the for loop below by creating the `GaussianMixture` model for every `n_components` in the `n_components_range`. Then plot the list of `bic` scores against the `n_components_range` and identify where number of components that yield the smalles BIC (NOTE: If the code runs to slowly, you may reduce the number of spikes the models are fit on).
+Fit a `GaussianMixture` model with `n_components=13` (which is the optimal number of components according to BIC) to the whole data.
+:::
+:::{.sol}
 ```{python}
-n_components_range = range(2, 10 + 1)
-bic = []
-for n_components in n_components_range:
-    print(f"Running GMM with {n_components} components")
-    gmm = 
-    gmm.fit(X[:3000])
-    bic.append(gmm.bic(X[:3000]))
+gmm = GaussianMixture(
+    n_components=13,
+)
+gmm.fit(X)
 ```
 :::
-
-:::{sol.}
-```{python}
-n_components_range = range(2, 10 + 1)
-bic = []
-for n_components in n_components_range:
-    print(f"Running GMM with {n_components} components")
-    gmm = GaussianMixture(n_components=n_components)
-    gmm.fit(X[:3000])
-    bic.append(gmm.bic(X[:3000]))
-plt.plot(n_components_range, bic)
-plt.xlabel("Number of Components")
-plt.xlabel("BIC")
-```
-:::
-
 
 ## Predicting and Inspecting Cluster Labels
 
@@ -417,26 +385,38 @@ plt.xlabel("BIC")
 ---
 
 :::{#exr-}
-The code below fits a `GaussianMixture` model with `n_components=13` (which is the optimal number of components according to BIC) to the whole data and then predicts the `spike_labels` and the probability of cluster membership `cluster_probs`. How man unique values are there in `spike_labels` and what is the shape of `cluster_probs`?
+Use `gmm.predict` to predict the `spike_labels` for the data `X` and print them.
+:::
+:::{.sol}
 ```{python}
-gmm = GaussianMixture(n_components=13,
-)
-gmm.fit(X)
 spike_labels = gmm.predict(X)
-cluster_probs = gmm.predict_proba(X)
+spike_labels
 ```
 :::
-:::{sol.}
+
+:::{#exr-}
+How many unique `spike_labels` are there?
+:::
+:::{.sol}
 ```{python}
 print(len(np.unique(spike_labels)))
-print(cluster_probs.shape)
+```
+:::
+
+:::{#exr-}
+Use `gmm.predict_proba` to predict the `cluster_probs` for `X` (i.e. the probabilities that each element in `X` belongs to a given cluster) and print their shape.
+:::
+:::{.sol}
+```{python}
+cluster_probs = gmm.predict_proba(X)
+cluster_probs.shape
 ```
 :::
 
 :::{#exr-}
 What is the `spike_label` assigned to the first spike? How many spikes have been assigned to the same label?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 print(spike_labels[0])
 sum(spike_labels==spike_labels[0])
@@ -446,25 +426,16 @@ sum(spike_labels==spike_labels[0])
 :::{#exr-}
 Plot the probability of cluster membership `cluster_prob` for the first spike as a histogram.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.hist(cluster_probs[0])
 ```
 :::
 
 :::{#exr-}
-Plot the probability of cluster membership `cluster_prob` for spike number 656. Would you be confident in assigning this spike to a specific cluster?
+What is the sum of all `cluster_probs` for a the first spike?
 :::
-:::{sol.}
-```{python}
-plt.hist(cluster_probs[656])
-```
-:::
-
-:::{#exr-}
-What is the sum of all `cluster_probs` for a given spike?
-:::
-:::{sol.}
+:::{.sol}
 ```{python}
 sum(cluster_probs[0])
 ```
@@ -473,64 +444,37 @@ sum(cluster_probs[0])
 :::{#exr-}
 Get the largest cluster membership probability for each spike (i.e. `cluster_probs.max(axis=1)` and plot them in a histogram.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 plt.hist(cluster_probs.max(axis=1))
 ```
 :::
 
 :::{#exm-}
-Reproduce the graph from @exm-pca, plotting the amplitude of the 1st PCA feature at **channel 1** against the amplitude at **channel 2** for the spikes from **clusters 1, 2 and 3**.
+PLot the amplitude of PCA feature at channel 1 (`X[:, 0, 0]`) against the amplitude at channel 2 (`X[:, 0, 1]`) for the spikes from `clusters=[0, 1, 2, 3]`
 :::
 ```{python}
-clusters = [0, 1, 2]
+clusters = [0, 1, 2, 3]
+X = waveforms_transformed
+plt.scatter(X[:, 0, 0], X[:, 0, 1], s=1, color="gray")
 for cluster in clusters:
     X = waveforms_transformed[spike_labels == cluster]
-    plt.scatter(X[:, 0, 0], X[:, 0, 1])
+    plt.scatter(X[:, 0, 0], X[:, 0, 1], s=5)
     plt.xlabel("Amplitude Ch 1 [a.u.]")
     plt.ylabel("Amplitude Ch 2 [a.u.]")
 ```
 
 :::{#exr-}
-The code below reproduces the graph from @exm-pca, plotting the amplitude of the 1st PCA feature at **channel 1** against the amplitude at **channel 2** and highlight the spikes from **clusters 1, 2 and 3**. Complete the `for` loop below by selecting all spikes from `waveforms_transformed` that have been assigned to the given `cluster` and store them in the variable `X`.
-```{python}
-# | eval: false
-clusters = [0, 1, 2, 3]
-X = waveforms_transformed
-plt.scatter(X[:, 0, 0], X[:, 0, 1], s=1, color="gray")
-for cluster in clusters:
-    X = 
-    plt.scatter(X[:, 0, 0], X[:, 0, 1], s=1, label=cluster)
-    plt.xlabel("Amplitude Ch 1 [a.u.]")
-    plt.ylabel("Amplitude Ch 2 [a.u.]")
-plt.legend()
-```
+PLot the amplitude of PCA feature at channel 1 (`X[:, 0, 0]`) against the amplitude at channel 3 (`X[:, 0, 2]`) for the spikes from `clusters=[0, 1, 2, 3]`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 clusters = [0, 1, 2, 3]
 X = waveforms_transformed
-plt.scatter(X[:, 0, 0], X[:, 0, 1], s=1, color="gray")
+plt.scatter(X[:, 0, 1], X[:, 0, 3], s=1, color="gray")
 for cluster in clusters:
     X = waveforms_transformed[spike_labels == cluster]
-    plt.scatter(X[:, 0, 0], X[:, 0, 1], s=1, label=cluster)
-    plt.xlabel("Amplitude Ch 1 [a.u.]")
-    plt.ylabel("Amplitude Ch 2 [a.u.]")
-plt.legend()
-```
-:::
-
-:::{#exr-}
-Recreate the graph from the previous exercise but plot the amplitude at **channel 1** against the amplitude at the **channel 3**. Which of the clusters likely represents a distinct unit?
-:::
-:::{sol.}
-```{python}
-clusters = [0, 1, 2, 3]
-X = waveforms_transformed
-plt.scatter(X[:, 0, 0], X[:, 0, 1], s=1, color="gray")
-for cluster in clusters:
-    X = waveforms_transformed[spike_labels == cluster]
-    plt.scatter(X[:, 0, 0], X[:, 0, 2], s=1, label=cluster)
+    plt.scatter(X[:, 0, 1], X[:, 0, 2], s=1, label=cluster)
     plt.xlabel("Amplitude Ch 1 [a.u.]")
     plt.ylabel("Amplitude Ch 2 [a.u.]")
 plt.legend()

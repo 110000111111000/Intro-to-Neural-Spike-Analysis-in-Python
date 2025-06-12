@@ -1,19 +1,17 @@
 ---
-title: "Preprocessing and Spike Sorting with SpikeInterface"
+title: "Spike Sorting with SpikeInterface"
 engine: Jupyter
 format: ipynb
-filter:
+filters:
     - assign
-execute: 
-  cache: true
 number-sections: true
 number-depth: 2
 ---
 
+## Preparation
+
+Import the modules required for this notebook
 ```{python}
-import os
-import requests
-import zipfile
 import numpy as np
 from matplotlib import pyplot as plt
 import spikeinterface.full as si
@@ -23,18 +21,21 @@ from probeinterface.plotting import plot_probe
 %matplotlib inline
 ```
 
+Download the Data required for this notebook
 ```{python}
+import os
+import requests
+import zipfile
 
 url = "https://uni-bonn.sciebo.de/s/lFAt1OuziUxdMkX/download"
 
-if not os.path.exists("openephys_recording"):
-    response = requests.get(url)
-    with open("openephys_recording.zip", "wb") as file:
-        file.write(response.content)
+response = requests.get(url)
+with open("openephys_recording.zip", "wb") as file:
+    file.write(response.content)
 
-    with zipfile.ZipFile("openephys_recording.zip", "r") as zip_ref:
-        zip_ref.extractall("")
-    os.remove("openephys_recording.zip")
+with zipfile.ZipFile("openephys_recording.zip", "r") as zip_ref:
+    zip_ref.extractall("")
+os.remove("openephys_recording.zip")
 ```
 
 ## Working with Recordings

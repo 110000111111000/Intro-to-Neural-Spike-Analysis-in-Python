@@ -14,3 +14,4 @@
 *.zip
 *.vdoc.*
 *.parquet
+*.npy

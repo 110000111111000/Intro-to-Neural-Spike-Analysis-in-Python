@@ -2,10 +2,8 @@
 title: "Detecting Spikes in Continuous Recordings"
 engine: Jupyter
 format: ipynb
-filter:
+filters:
     - assign
-execute: 
-  cache: true
 number-sections: true
 number-depth: 2
 ---
@@ -22,13 +20,13 @@ from scipy import signal
 Define the utility functions required for this session.
 ```{python}
 class utils:
-    def plot_frequency_response(b, a, cutoff_low=None, cutoff_high=None):
+    def plot_frequency_response(b, a, cutoff):
         w, h = signal.freqz(b, a, fs=30000)
         plt.semilogx(w, np.abs(h), label="Filter")
-        if cutoff_low is not None:
-            plt.axvline(cutoff_low, color="red", label="low cutoff")
-        if cutoff_high is not None:
-            plt.axvline(cutoff_high, color="green", label="high cutoff")
+        if not isinstance(cutoff, list):
+            cutoff = [cutoff]
+        for c in cutoff:
+            plt.axvline(c, color="red", label="Cutoff")
         plt.xlabel("Frequency [Hz]")
         plt.ylabel("Gain [a.u.]")
         plt.legend()
@@ -38,95 +36,94 @@ Download the data required for this session
 ```{python}
 import requests
 
-url = "https://uni-bonn.sciebo.de/s/bRc91rzP45q2C84/download"
+url = "https://uni-bonn.sciebo.de/s/bRc91rzP45q2C84"
 fname = "raw_tetrode_recording.parquet"
-
-if not os.path.exists(f"../data/{fname}"):
-    response = requests.get(url)
-    with open(f"../data/{fname}", "wb") as file:
-        file.write(response.content)
+response = requests.get(f"{url}/download")
+print("Downloading Data ...")
+with open(fname, "wb") as file:
+    file.write(response.content)
+print("Done!")
 ```
 
 ## Inspecting Raw Extracellular Recordings
+
+In this notebook, our aim is to extract spike waveforms from raw electrophysiological recordings from a tetrode (a probe with four separate electrodes). In this section we are going to load the data into a pandas data frame and explore its contents.
 
 | Code | Description |
 | --- | --- |
 | `df = pd.read_parquet("data.parquet")` | Read a Parquet file into a pandas data frame |
 | `df.head(5)` | Print the first 5 rows of `df` |
 | `df.loc[0:10]` | Get all entries in `df` between the index values `0` and `10` |
-| `df["Col1"]` | Access the values stored in the column labeled `"Col1"` |
+| `df.loc[tmin:tmax]` | Get all entries in `df` between the index values `tmin` and `tmax` |
+| `df.col1` | Access the values stored in the column labeled `"col1"` |
 | `df.index` | Access the index of the data frame `df` |
-| `plt.subplot(2, 2, 1)` | Generate the 1st subplot in a 2-by-2 grid |
+| `df.index.max(0)` | Get the maximum index of `df` |
 
 ---
 
 :::{#exr-}
 Load the file `"../data/raw_tetrode_recording.parquet"` into a pandas data frame and print the first 10 rows
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-df = pd.read_parquet("../data/raw_tetrode_recording.parquet")
+df = pd.read_parquet("raw_tetrode_recording.parquet")
 df.head(10)
+```
+:::
+:::{.direction}
+```{python}
+# | echo: false
+print("​")
 ```
 :::
 
 :::{#exr-}
 what is the duration of the recording and how many samples (i.e. rows) are there? What is the sampling rate of the recording?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 sampling_rate = len(df) / df.index.max(0)
 sampling_rate
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
-:::{#exm}
-Plot the data recorded at `"Ch1"` between **0 and 1 s**.
+:::{#exm-}
+Plot the data recorded at `"Ch1"` between `tmin=0` and `tmax=3`.
+:::
 ```{python}
 tmin, tmax = 0, 3
 data = df["Ch1"].loc[tmin:tmax]
 plt.plot(data.index, data)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 ```
-:::
 
 :::{#exr-}
-Plot the data recorded at `"Ch2"` between **10 and 20 s**.
+Plot the data recorded at `"Ch2"` between `tmin=10` and `tmax=20`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin, tmax = 10, 20
 data = df["Ch2"].loc[tmin:tmax]
 plt.plot(data.index, data)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 ```
 :::
-
-:::{#exr-}
-Plot the data recorded at channels `"Ch1"` and `"Ch2"` between **10 and 20 s** as a 2-by-1 subplot.
-:::
-:::{sol.}
+:::{.direction}
 ```{python}
-tmin, tmax = 10, 20
-data = df["Ch1"].loc[tmin:tmax]
-plt.subplot(2, 1, 1)
-plt.plot(data.index, data)
-plt.ylabel("Voltage [muV]")
-
-data = df["Ch2"].loc[tmin:tmax]
-plt.subplot(2, 1, 2)
-plt.plot(data.index, data)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
+#| echo: false
+print('​')
 ```
 :::
 
+
 :::{#exr-}
-Compute the difference between the data recorded at channels `"Ch1"` and `"Ch2"` between **10 and 20 s**, and plot it.
+Compute the difference between the data recorded at channels `"Ch1"` and `"Ch2"` between `tmin=10` and `tmax=20`, and plot it.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin, tmax = 10, 20
 data = df["Ch1"].loc[tmin:tmax] - df["Ch2"].loc[tmin:tmax]
@@ -134,15 +131,21 @@ plt.plot(data.index, data)
 plt.ylabel("Voltage [muV]")
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 
 :::{#exr-}
-Plot the data recorded at channels `"Ch1"`, `"Ch2"`, `"Ch3"` and `"Ch4"` between **0 and 0.1 s** in the same plot.
+Plot the data recorded at channels `"Ch1"` and `"Ch3"` between `tmin=0.05` and `tmax=0.06` in the same plot.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin, tmax = 0.05, 0.06
-for ch in ["Ch1", "Ch2", "Ch3", "Ch4"]:
+for ch in ["Ch1", "Ch3"]:
     data = df[ch].loc[tmin:tmax]
     plt.plot(data.index, data, label=ch)
 plt.legend()
@@ -150,32 +153,45 @@ plt.xlabel("Time [s]")
 plt.ylabel("Voltage [muV]")
 ```
 :::
-
-
-## Filtering
-| Code | Description |
-| --- | --- |
-| `b, a=signal.butter(4, 100, "lowpass", fs)` | Generate a 4-th order Butterworth `"lowpass"` filter with a cutoff frequency of 100 Hz at the sampling rate `fs` |
-| `b, a=signal.butter(6, 2000, "highpass", fs)` | Generate a 6-th order `"highpass"` filter with a cutoff frequency of 2 kHz |
-| `b, a=signal.butter(6, [100, 2000], "bandpass", fs)` | Generate a 6-th order `"bandpass"` filter with a low cutoff at `100 Hz` and  a high cutoff at `2000 Hz` |
-| `utils.plot_frequency_response(b, a, cutoff_low=100, cutoff_high=2000)` | Plot the frequency response of the filter with the coefficients `a` and `b` and mark the low and high frequency cutoff |
-| `signal.filtfilt(b,a,data)` | Apply the filter with coefficients `b` and `a` to `data`, forwards and backwards |
-| `signal.filtfilt(b,a,data,axis=0)` | Apply the filter with coefficients `b` and `a` across the first dimension of `data` |
-
----
-
-:::{#exm-make_filt}
-Create a 4-th order Butterworth `"lowpass"` filter with a  cutoff frequency of **500 Hz** and plot it's frequency response
+:::{.direction}
 ```{python}
-cutoff_high = 500
-order = 4
-b, a = signal.butter(order, cutoff_high, btype="lowpass", fs=30000)
-utils.plot_frequency_response(b, a, cutoff_high=cutoff_high)
+#| echo: false
+print('​')
 ```
 :::
 
-:::{#exm}
-Apply the filter generated in @exm-make_filt to the data recorded at `"Ch1"` between **0 and 3s**, then plot the raw and filtered signal
+
+## Filtering
+
+Extracellular electrophysiological recordings contain raw voltage traces from every electrode. These recordings contain the spikes we want to analyze but they also contain other signals like local field potentials (LFPs) and artifacts. To extract the spikes we have to filter out the part of the signal that contains the spikes. In this section, we will explore how to construct infinite-impulse response (IIR) filter and apply them to the data to extract specific parts of the frequency spectrum.
+
+| Code | Description |
+| --- | --- |
+| `b, a=signal.butter(4, 100, "lowpass", fs)` | Generate a 4-th order Butterworth `"lowpass"` filter with a cutoff frequency of `100` Hz at the sampling rate `fs` |
+| `b, a=signal.butter(6, 2000, "highpass", fs)` | Generate a 6-th order `"highpass"` filter with a cutoff frequency of `2000` Hz |
+| `b, a=signal.butter(6, [100, 2000], "bandpass", fs)` | Generate a 6-th order `"bandpass"` filter with a low cutoff at `100` Hz and  a high cutoff at `2000` Hz |
+| `utils.plot_frequency_response(b, a, cutoff)` | Plot the frequency response of the filter with the coefficients `a` and `b` and mark the cutoff |
+| `signal.filtfilt(b,a,data)` | Apply the filter with coefficients `b` and `a` to `data`, forwards and backwards |
+| `signal.filtfilt(b,a,data,axis=0)` | Apply the filter with coefficients `b` and `a` across the first dimension of `data` |
+| `plt.subplot(2, 1, 1)` | Generate the 1st subplot in a 2-by-1 grid |
+| `plt.subplot(2, 1, 2)` | Generate the 2nd subplot in a 2-by-1 grid |
+| `df.loc[:] = x` | Overwrite the content of `df` with `x` |
+
+---
+
+:::{#exm-}
+Create a Butterworth `"lowpass"` filter with `order=4`,  `cutoff=500` and `fs=30000` and plot its frequency response.
+:::
+```{python}
+cutoff = 500
+order = 4
+b, a = signal.butter(order, cutoff, btype="lowpass", fs=30000)
+utils.plot_frequency_response(b, a, cutoff=cutoff)
+```
+
+:::{#exm-}
+Use `signal.filtfilt()` to apply the filter coefficients `b` and `a` to the `data` recorded at `"Ch1"` between `tmin=0` and `tmax=3` and plot the raw and filtered signal in a 2-by-1 subplot grid.
+:::
 ```{python}
 tmin, tmax = 0, 3
 data = df["Ch1"].loc[tmin:tmax]
@@ -183,30 +199,32 @@ data_filt = signal.filtfilt(b, a, data)
 
 plt.subplot(2, 1, 1)
 plt.plot(data.index, data)
-plt.ylabel("Voltage [muV]")
-
 plt.subplot(2, 1, 2)
 plt.plot(data.index, data_filt)
-plt.ylabel("Voltage [muV]")
-plt.xlabel("Time [s]")
-plt.tight_layout()
+```
+
+:::{#exr-}
+Create a Butterworth `"lowpass"` filter with `order=4`,  `cutoff=300` and `fs=30000` and plot its frequency response.
+:::
+:::{.sol}
+```{python}
+cutoff = 300
+order = 4
+b, a = signal.butter(order, cutoff, btype="lowpass", fs=30000)
+utils.plot_frequency_response(b, a, cutoff=cutoff)
 ```
 :::
-
-:::{#exr-lp}
-Create a 4-th order Butterworth `"lowpass"` filter with a  cutoff frequency of **300 Hz** and plot it's frequency response.
+:::{.direction}
 ```{python}
-cutoff_high = 300
-order = 4
-b, a = signal.butter(order, cutoff_high, btype="lowpass", fs=30000)
-utils.plot_frequency_response(b, a, cutoff_high=cutoff_high)
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Apply the filter generated in @exr-lp to the data recorded at `"Ch2"` between **0 and 3s**, then plot the raw and filtered signal
+Use `signal.filtfilt()` to apply the filter coefficients `b` and `a` to the `data` recorded at `"Ch2"` between `tmin=0` and `tmax=3` and plot the raw and filtered signal in a 2-by-1 subplot grid.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin, tmax = 0, 3
 data = df["Ch2"].loc[tmin:tmax]
@@ -214,32 +232,39 @@ data_filt = signal.filtfilt(b, a, data)
 
 plt.subplot(2, 1, 1)
 plt.plot(data.index, data)
-plt.ylabel("Voltage [muV]")
-
 plt.subplot(2, 1, 2)
 plt.plot(data.index, data_filt)
-plt.ylabel("Voltage [muV]")
-plt.xlabel("Time [s]")
-plt.tight_layout()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
-:::{#exr-hp}
-Create a **6-th** order Butterworth `"highpass"` filter with a  cutoff frequency of **500 Hz** and plot it's frequency response.
+:::{#exr}
+Create a Butterworth `"highpass"` filter with `order=6`, `cutoff=1000` and `fs=30000` and plot its frequency response.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-cutoff_low = 1000
+cutoff = 1000
 order = 6
-b, a = signal.butter(order, cutoff_low, btype="highpass", fs=30000)
-utils.plot_frequency_response(b, a, cutoff_high=cutoff_high)
+b, a = signal.butter(order, cutoff, btype="highpass", fs=30000)
+utils.plot_frequency_response(b, a, cutoff=cutoff)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Apply the filter generated in @exr-hp to the data recorded at `"Ch3"` between **15 and 20s**, then plot the raw and filtered signal
+Use `signal.filtfilt()` to apply the filter coefficients `b` and `a` to the `data` recorded at `"Ch3"` between `tmin=15` and `tmax=20` and plot the raw and filtered signal in a 2-by-1 subplot grid.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin, tmax = 15, 20
 data = df["Ch3"].loc[tmin:tmax]
@@ -247,34 +272,40 @@ data_filt = signal.filtfilt(b, a, data)
 
 plt.subplot(2, 1, 1)
 plt.plot(data.index, data)
-plt.ylabel("Voltage [muV]")
-
 plt.subplot(2, 1, 2)
 plt.plot(data.index, data_filt)
-plt.ylabel("Voltage [muV]")
-plt.xlabel("Time [s]")
 plt.tight_layout()
 ```
 :::
-
-
-:::{#exr-bp}
-Create a **6-th** order Butterworth `"bandpass"` filter with a low cutoff frequency of **500 Hz** and a high cutoff frequency of **5000 Hz** and plot it's frequency response.
-:::
-:::{sol.}
+:::{.direction}
 ```{python}
-cutoff_low = 500
-cutoff_high = 5000
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr}
+Create a Butterworth `"bandpass"` filter with `order=6`, `cutoff=[500, 5000]`  and and `fs=30000` and plot its frequency response.
+:::
+:::{.sol}
+```{python}
+cutoff = [500, 5000]
 order = 6
-b, a = signal.butter(order, [cutoff_low, cutoff_high], btype="bandpass", fs=30000)
-utils.plot_frequency_response(b, a, cutoff_low=cutoff_low, cutoff_high=cutoff_high)
+b, a = signal.butter(order, cutoff, btype="bandpass", fs=30000)
+utils.plot_frequency_response(b, a, cutoff=cutoff)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Apply the filter generated in @exr-hbp to the data recorded at `"Ch4"` between **50 and 60s**, then plot the raw and filtered signal
+Use `signal.filtfilt()` to apply the filter coefficients `b` and `a` to the `data` recorded at `"Ch4"` between `tmin=50` and `tmax=60` and plot the raw and filtered signal in a 2-by-1 subplot grid.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 tmin, tmax = 50, 60
 data = df["Ch4"].loc[tmin:tmax]
@@ -282,129 +313,162 @@ data_filt = signal.filtfilt(b, a, data)
 
 plt.subplot(2, 1, 1)
 plt.plot(data.index, data)
-plt.ylabel("Voltage [muV]")
-
 plt.subplot(2, 1, 2)
 plt.plot(data.index, data_filt)
-plt.ylabel("Voltage [muV]")
-plt.xlabel("Time [s]")
-plt.tight_layout()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-The code below applies the filter generated in @exr-bp to the whole data frame `df`. Overwrite the content of `df` with the filtered `data` (HINT: `df.loc[:]=`).
+Use `signal.filtfilt()` to apply the filter coefficients `b` and `a` to the whole data frame `df` across `axis=0` and return the filtered `data`. Then, use `df.loc[:]=data` to overwrite `df` with the filtered data.
+:::
+:::{.sol}
 ```{python}
 data = signal.filtfilt(b, a, df, axis=0)
+df.loc[:] = data
 ```
 :::
-:::{sol.}
+:::{.direction}
 ```{python}
-df.loc[:] = data
+#| echo: false
+print('​')
 ```
 :::
 
 ## Detecting Spikes
 
+To detect spikes, we need to estimate the level of noise in the data and define a threshold (i.e. 5 times the noise level) to categorize signals that cross this threshold as spikes. The noise level is calculated as the median absolute deviation (MAD) of the signal:
+
+$$
+MAD=median(|X_i - median(X)|)
+$$
+
+This is a useful measure because the median is more robust to large deviations compared to the mean. Because an action potential is a depolarization (i.e. a positive spike) in the cell, it is reflected as a negative spike in the extracellular recording. In this section, we are going to explore how to compare the signal against a noise threshold to identify the times at which spikes occur.
+
 | Code | Description |
 | --- | --- |
-| `np.std(x)` | Compute the stanard deviation of the values in `x` |
 | `np.median(x)` | Compute the median of the values in `x` |
 | `np.abs(x)` | Get the absolute value of `x` |
-| `x.any(axis=0)` | Returns `True` for each row of `x` where at least one element is `True` |
+| `x = (df < threshold).any(axis=1)` | Return an array that is `True` for all elements of `df` where any column is smaller  than the `threshold` |
+| `x = x.astype(int)` | Convert the values in `x` to integers |
+| `np.diff(x)` | Compute the difference between subsequent elements of `x` |
+| `peak_time = df.loc[tmin:tmax].idxmin()` | Get the index of the minimum value for each column in `df` between `tmin` and `tmax` |
+| `peak_time = df.loc[tmin:tmax].idxmin().min()` | Get the index of the minimum value in `df` between `tmin` and `tmax` across all columns |
 
 ---
 
-:::{#exr-}
-Compute the noise level `sigma` for the first channel as the standard deviation of the data recorded at `"Ch1"`
-:::
-:::{sol.}
-```{python}
-sigma = np.std(df["Ch1"])
-sigma
-```
-:::
 
 :::{#exm-sigma}
-Compute the roubust noise level `sigma` for first channel as the median absolute deviation of the data recorded at `"Ch1"` divided by `0.6745`. How does this value compare to to the previously computed threshold?
+Compute the robust noise level `sigma` for first channel as the median absolute deviation (MAD) of the data recorded at `"Ch1"`.
+:::
 ```{python}
 x = df["Ch1"]
-sigma = np.median(np.abs(x - x.mean(axis=0)) / 0.6745, axis=0)
+sigma = np.median(np.abs(x - x.median(axis=0)), axis=0)
 sigma
 ```
-:::
 
 :::{#exr-}
-Compute the robust noise level `sigma` for the data recorded at `"Ch2"`.
+Compute the robust noise level `sigma` for the data recorded at `"Ch2"`. Does this mean the signal recorded at `"Ch2"` is more or less noisy than the signal at `"Ch1"`?
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 x = df["Ch2"]
-sigma = np.median(np.abs(x - x.mean(axis=0)) / 0.6745, axis=0)
+sigma = np.median(np.abs(x - x.median(axis=0)), axis=0)
 sigma
 ```
 :::
-
-:::{#exr-}
-Which channel has the highest noise threshold?
-:::
-:::{sol.}
+:::{.direction}
 ```{python}
-x = df
-sigmas = np.median(np.abs(df - df.mean(axis=0)) / 0.6745, axis=0)
-np.argmax(sigmas)
+#| echo: false
+print('​')
 ```
 :::
 
-:::{#exm-thresh}
-Find all samples in `df` that are below the `threshold` defined as the signal's mean plus `b * sigma` for **b=2** and assign them to a variable `is_spike`.
+:::{#exm-}
+Find which samples in `df` are below the `threshold` of `b * sigma` for `b=2` and assign them to a variable `is_below_thresh`. Convert that variable to integers and print the total number of samples below the `threshold`.
+:::
 ```{python}
 b = 2
 threshold = -1 * (np.mean(df, axis=0) + b * sigma)
-is_spike = (df<threshold).any(axis=1)
+is_below_thresh = (df < threshold).any(axis=1)
+is_below_thresh = is_below_thresh.astype(int)
+sum(is_below_thresh)
 ```
-:::
 
 :::{#exm-}
-Check where the difference between the values of `is_spike` is `1`, i.e. where the signal crosses from above to below the threshold and get the points in time where this happens, Then, print the number of threshold crossings.
+Get the time points where difference between the values of `is_below_threshold` is `1`, i.e. where the signal crosses from above to below the threshold and print the number of `crossing_times`.
+:::
 ```{python}
-is_crossing = is_spike.astype(int) == 1
-crossing_times = df[crossings].index
+is_crossing = is_below_thresh.diff() == 1
+crossing_times = df[is_crossing].index
 len(crossing_times)
 ```
-:::
 
 :::{#exr-}
-Increase `b` to **4**, get the time points where the signal crosses the threshold and print the number of threshold crossings.
+Set `b=4` and find which samples in `df` are below the `threshold` of `b * sigma` for `b=4` and assign them to a variable `is_below_thresh`. Convert that variable to integers and print the total number of samples below the `threshold`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 b = 4
 threshold = -1 * (np.mean(df, axis=0) + b * sigma)
-is_spike = (df < threshold).any(axis=1)
-is_crossing = is_spike.astype(int) == 1
-crossing_times = df[crossings].index
-len(crossing_times)
+is_below_thresh = (df < threshold).any(axis=1)
+is_below_thresh = is_below_thresh.astype(int)
+sum(is_below_thresh)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Increase `b` to **5**, get the time points where the signal crosses the threshold and print the number of threshold crossings.
+Get the time points where difference between the values of `is_below_threshold` is `1`, i.e. where the signal crosses from above to below the threshold and print the number of `crossing_times`.
 :::
-:::{sol.}
+:::{.sol}
+```{python}
+is_crossing = is_below_thresh.diff() == 1
+crossing_times = df[is_crossing].index
+len(crossing_times)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Set `b=5`, get the times where the signal crosses the `b*sigma` threshold and print the total number of `crossing_times`.
+:::
+:::{.sol}
 ```{python}
 b = 5
 threshold = -1 * (np.mean(df, axis=0) + b * sigma)
-is_spike = (df < threshold).any(axis=1)
-is_crossing = is_spike.astype(int) == 1
-crossing_times = df[crossings].index
+is_below_thresh = (df < threshold).any(axis=1)
+is_below_thresh = is_below_thresh.astype(int)
+is_crossing = is_below_thresh.diff() == 1
+crossing_times = df[is_crossing].index
 len(crossing_times)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exm-}
-For the first crossing time, get the lowest point (i.e. the negative peak) within a **2 ms** window and get the channel volatges at this `peak_time`.
-Which channel recorded the largest signal?
+For the first crossing time, get the lowest point (i.e. the negative peak) within a `window=2*1e-3` seconds and get the channel voltages at this `peak_time`.
+:::
 ```{python}
 window = 2 * 1e-3
 tmin = crossing_times[0]
@@ -412,31 +476,42 @@ tmax = tmin + window
 peak_time = df.loc[tmin:tmax].idxmin().min()
 df.loc[peak_time]
 ```
-:::
 
 :::{#exr-}
-Get the peak time for the **10th** crossing time and get the channel voltages at the peak time. Which channel recorded the largest signal?
+Get the peak time for the 10th crossing time and get the channel voltages at the peak time. Which channel recorded the largest signal for this spike?
+:::
+:::{.sol}
 ```{python}
 window = 2 * 1e-3
-tmin = crossing_times[10]
+tmin = crossing_times[9]
 tmax = tmin + window
 peak_time = df.loc[tmin:tmax].idxmin().min()
 df.loc[peak_time]
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
 
 :::{#exr-}
 Complete the loop below to get the `peak_time` for every crossing time `c_t` and append it to the list `spike_times`.
+:::
 ```{python}
 # | eval: false
 window = 2 * 1e-3
 spike_times = []
 for c_t in crossing_times:
-
+    tmin = # your code here
+    tmax = # your code here
+    peak_time= # your code here
     spike_times.append(peak_time)
+len(crossing_times), len(spike_times)
 ```
-:::
-:::{sol.}
+:::{.sol}
 ```{python}
 window = 2 * 1e-3
 spike_times = []
@@ -445,63 +520,103 @@ for c_t in crossing_times:
     tmax = tmin + window
     peak_time = df.loc[tmin:tmax].idxmin().min()
     spike_times.append(peak_time)
+len(crossing_times), len(spike_times)
 ```
 :::
 
 :::{#exm-}
-Plot the recording at `"Ch1"` and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between **0.03 and 0.04 s**.
+Plot the recording at `"Ch1"` and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between `0.03` and `0.04` seconds.
+:::
 ```{python}
 ch = "Ch1"
 plt.plot(df[ch].index, df[ch])
-plt.plot(df[ch][spike_times].index, df[ch][spike_times], "r.")
+plt.plot(df[ch].loc[spike_times].index, df[ch].loc[spike_times], "r.")
 plt.xlim(0.03, 0.04)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 ```
-:::
 
 :::{#exr-}
-Plot the recording at `"Ch4"` and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between **0.03 and 0.04 s**.
+Plot the recording at `"Ch4"` and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between `0.03` and `0.04` seconds.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 ch = "Ch4"
 plt.plot(df[ch].index, df[ch])
-plt.plot(df[ch][spike_times].index, df[ch][spike_times], "r.")
+plt.plot(df[ch].loc[spike_times].index, df[ch].loc[spike_times], "r.")
 plt.xlim(0.03, 0.04)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 ```
 :::
-
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
-Plot the recording at `"Ch2"` and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between **1 and 1.5 s**.
+Complete the loop below to plot the recording at all channels and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between `0.03` and `0.04` seconds.
 :::
-:::{sol.}
 ```{python}
-ch = "Ch2"
-plt.plot(df[ch].index, df[ch])
-plt.plot(df[ch][spike_times].index, df[ch][spike_times], "r.")
-plt.xlim(1, 1.5)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
+# | eval: false
+for i, ch in enumerate(df.columns):
+    plt.subplot(4, 1, i + 1)
+    plt.plot( # your code here
+    plt.plot( # your code here
+    plt.xlim(0.03, 0.04)
+```
+:::{.sol}
+```{python}
+for i, ch in enumerate(df.columns):
+    plt.subplot(4, 1, i + 1)
+    plt.plot(df[ch].index, df[ch])
+    plt.plot(df[ch].loc[spike_times].index, df[ch].loc[spike_times], "r.")
+    plt.xlim(0.03, 0.04)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
+:::{#exr-}
+Plot the recording at `"Ch3"` and mark the `spike_times` with red dots. Then, set the `plt.xlim()` so the plot shows the time between `1` and `1.5` seconds.
+:::
+:::{.sol}
+```{python}
+ch = "Ch3"
+plt.plot(df[ch].index, df[ch])
+plt.plot(df[ch].loc[spike_times].index, df[ch].loc[spike_times], "r.")
+plt.xlim(1, 1.5)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 ## Extract and Visualize Spike Waveforms
+
+Now that we have the times at which spikes occur, we can extract the spike waveforms that we will use for spike sorting from the signal. Those spikes will be stored in a 3D matrix where the first dimension represents the spikes, the second represents the points in time and the third dimension represents the channels. By visualizing the waveforms across channels, we will see the differences in spike shape, amplitude and arrival times that we can use to sort the spikes later on.
 
 | Code | Description |
 | --- | --- |
 | `df.columns` | Get the columns of the data frame `df` |
 | `df.to_numpy()` | Export the data in `df` to a numpy array |
-| `np.stack(x)` | Stack a list of numpy arrays into a single multi-dimensional numpy array |
+| `x = []` | Define an empty list `x` |
+| `x.append(k)` | Append `k` to the list `x` |
+| `x = np.stack(x)` | Stack a list of numpy arrays into a single multi-dimensional numpy array |
+| `x[:,:,0]` | Get the first element along the 3rd dimension of `x` |
+| `x[0:10,:,1]` | Get the first 10 elements along the first dimension and the first element along the 3rd dimension of `x` |
+| `x.mean(axis=0)` | Get the mean along the first dimension of `x` |
+|`df.loc[tmin:tmax].to_numpy()` | Get all rows of `df` between the index values `tmin` and `tmax` and export them to a numpy array |
 
 ---
 
-:::{#exm}
-Get the `waveform` of the 1st spike by extracting the signal recorded within +/- **2 ms** around the spike.
+:::{#exm-}
+Get the `waveform` of the 1st spike by extracting the signal recorded within +/- `2*-1e3` seconds around the spike time.
 :::
 ```{python}
 window = 2 * 1e-3
@@ -511,58 +626,67 @@ waveform = df.loc[tmin:tmax]
 ```
 
 :::{#exm-}
-Plot the extracted `waveform` for every channel and label the lines accordingly.
+Plot the extracted `waveform` for every channel and add a `plt.legend()`.
+:::
 ```{python}
 plt.plot(waveform.index, waveform, label=waveform.columns)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 plt.legend()
 ```
-:::
 
 :::{#exr-}
-Get the `waveform` of the 1st spike by extracting the signal recorded within +/- **0.5 ms** around the spike and plot the waveform for each channel.
+Get the `waveform` of the 1st spike by extracting the signal recorded within +/- `0.5*-1e3` seconds around the spike time and plot the extracted spike for every channel.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 window = 0.5 * 1e-3
 tmin = spike_times[0] - window
 tmax = spike_times[0] + window
 waveform = df.loc[tmin:tmax]
 plt.plot(waveform.index, waveform, label=waveform.columns)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 plt.legend()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Get the `waveform` of the last spike by extracting the signal recorded within +/- **0.5 ms** around the spike and plot the waveform for each channel. What does the shape of the waveforms reveal about the neurons location with respect to the channels?
+Get the `waveform` of the 2nd spike by extracting the signal recorded within +/- `0.5*-1e3` seconds around the spike time and plot the extracted spike for every channel.
 :::
+:::{.sol}
 ```{python}
 window = 0.5 * 1e-3
-tmin = spike_times[-1] - window
-tmax = spike_times[-1] + window
+tmin = spike_times[1] - window
+tmax = spike_times[1] + window
 waveform = df.loc[tmin:tmax]
 plt.plot(waveform.index, waveform, label=waveform.columns)
-plt.xlabel("Time [s]")
-plt.ylabel("Voltage [muV]")
 plt.legend()
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Complete the loop below by extracting the `waveform` for every item `s` in the list of `spike_times`.
+:::
 ```{python}
 # | eval: false
 window = 0.5 * 1e-3
 waveforms = []
 for s in spike_times:
-    waveform =
+    waveform = # your code here
     waveforms.append(waveform.to_numpy())
 waveforms = np.stack(waveforms)
+waveforms.shape
 ```
-:::
-:::{sol.}
+:::{.sol}
 ```{python}
 window = 0.5 * 1e-3
 waveforms = []
@@ -570,49 +694,58 @@ for s in spike_times:
     waveform = df.loc[s - window : s + window]
     waveforms.append(waveform.to_numpy())
 waveforms = np.stack(waveforms)
+waveforms.shape
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exm-}
-Plot the first **100** `waveforms` for each channel.
+Plot the first `5` `waveforms` for each channel.
+:::
 ```{python}
-t = np.linspace(-window, +window, waveforms.shape[1]) * 1e3
 for i in range(4):
     plt.subplot(2, 2, i + 1)
-    plt.plot(t, waveforms[:100, :, i].T, linewidth=0.5)
-    plt.title(f"Channel {i+1}")
-    plt.xlabel("Time [ms]")
-    plt.ylabel("Voltage [muV]")
+    plt.plot(waveforms[:5, :, i].T, linewidth=0.5)
 plt.tight_layout()
+```
+
+:::{#exr-}
+Plot the last `5` `waveforms` for each channel.
+:::
+:::{.sol}
+```{python}
+for i in range(4):
+    plt.subplot(2, 2, i + 1)
+    plt.plot(waveforms[-5:, :, i].T, linewidth=0.5)
+plt.tight_layout()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Plot the last **50** `waveforms` for each channel.
+Compute the mean waveform for every channel (i.e. `waveforms.mean(axis=0)`) and plot them in the same graph.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-t = np.linspace(-window, +window, waveforms.shape[1]) * 1e3
-for i in range(4):
-    plt.subplot(2, 2, i + 1)
-    plt.plot(t, waveforms[-50:, :, i].T, linewidth=0.5)
-    plt.title(f"Channel {i+1}")
-    plt.xlabel("Time [ms]")
-    plt.ylabel("Voltage [muV]")
-plt.tight_layout()
-```
-:::
-
-:::{#exr-}
-Compute the mean waveform for every channel (i.e. the mean across the first dimenson `waveforms.mean(axis=0)`) and plot them in the same graph.
-:::
-:::{sol.}
-
-:::
-```{python}
-t = np.linspace(-window, +window, waveforms.shape[1]) * 1e3
-plt.plot(t, waveforms.mean(axis=0), linewidth=0.5, label=df.columns)
+plt.plot(waveforms.mean(axis=0), linewidth=0.5, label=df.columns)
 plt.xlabel("Time [ms]")
 plt.ylabel("Voltage [muV]")
 plt.legend()
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::

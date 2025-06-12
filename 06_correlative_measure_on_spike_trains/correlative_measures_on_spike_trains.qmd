@@ -252,6 +252,8 @@ plt.plot(bst.bin_centers, bst.to_array().flatten())
 
 ---
 
+Add sliding window correlation?
+
 :::{#exm-}
 Simualte a Poisson neuron with a rate of **1 Hz** that is active for **10 s**. Then. generate **50** spike trains from that neuron and convert them to a binned spke train with a `bin_size` of **5 ms**.
 ```{python}
@@ -409,6 +411,8 @@ img = plt.imshow(r)
 plt.colorbar(img)
 ```
 :::
+
+## Significance Testing with Spike Time Shuffling
 
 ## Cross-Correlation Histrogram
 

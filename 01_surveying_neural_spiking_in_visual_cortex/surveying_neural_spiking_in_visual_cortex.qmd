@@ -476,7 +476,7 @@ Compute the number of spike times for each `"brain_area"` and `"unit_id"`.
 :::
 :::{.sol}
 ```{python}
-df.groupby(["brain_area", "unit_id"]).spike_time.nunique()
+df.groupby(["brain_area", "unit_id"]).spike_time.coun()
 ```
 :::
 :::{.direction}
@@ -492,7 +492,7 @@ Divide the result from @exr-count by the duration of the recording to get the fi
 :::{.sol}
 ```{python}
 dur = df.spike_time.max() - df.spike_time.min()
-fr = df.groupby(["brain_area", "unit_id"]).spike_time.nunique() / dur
+fr = df.groupby(["brain_area", "unit_id"]).spike_time.count() / dur
 ```
 :::
 :::{.direction}

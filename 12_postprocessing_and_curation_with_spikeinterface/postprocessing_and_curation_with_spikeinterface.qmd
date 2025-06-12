@@ -2,10 +2,8 @@
 title: "Postprocessing and Curation with SpikeInterface"
 engine: Jupyter
 format: ipynb
-filter:
+filters:
     - assign
-execute: 
-  cache: true
 number-sections: true
 number-depth: 2
 ---
@@ -18,11 +16,14 @@ import numpy as np
 from matplotlib import pyplot as plt
 import spikeinterface.full as si
 import probeinterface as pi
+from probeinterface.plotting import plot_probe
+
 %matplotlib inline
 ```
 
 Download the data for this notebook (this may take a while)
 ```{python}
+# | eval: false
 import os
 import zipfile
 import requests
@@ -50,65 +51,54 @@ for url, fname in zip(urls, fnames):
 print("Done!")
 ```
 
-## Extracting and Visualizing Spike Waveforms
+## Extracting Waveforms and Computing Templates
+
+After spike sorting, we have the times when spikes occurred, but to validate and understand the sorted units, we need to examine their shapes. This process involves extracting the raw voltage "snippets" (waveforms) around each detected spike time. SpikeInterface streamlines this with the SortingAnalyzer object, a central hub that links a sorting result with its corresponding recording. In this section, you will learn how to create an analyzer and compute "extensions" like spike waveforms and average templates, which are the basis for all subsequent quality control and analysis.
 
 | Code | Description |
-| --- | --- |
-| `rec = si.load_extractor("mydir")` | Load the recording extractor stored in the folder `"mydir"` |
-| `sorting = si.read_sorter_folder("results_SPC")` | Load the spike sorting results stored in the folder `"/results_SPC"` |
-| `analyzer = si.create_sorting_analyzer(sorting, recording)` | Create an analyzer by pairing `sorting` results with the respective `recording` and assign the resulting object to a variable `analyzer` |
-| `analyzer.compute("extension_name")` | Compute an extension for the `analyzer` with a given name |
-| `ext = analyzer.get_extension("extension_name")` | Get an extension from the `analyzer` and assign it to a variable `ext` |
+|---|---|
+| `rec = si.load_extractor("mydir")` | Load a recording extractor stored in the folder `"mydir"`. |
+| `sorting = si.read_sorter_folder("results_SPC")` | Load spike sorting results from a folder. |
+| `analyzer = si.create_sorting_analyzer(sorting, rec)` | Create an analyzer by pairing sorting results with the recording. |
+| `analyzer.compute("random_spikes", **kwargs)` | Randomly sample spikes from each unit for efficient processing. |
+| `analyzer.compute("waveforms", **kwargs)` | Extract spike waveforms for the sampled spikes. |
+| `analyzer.compute("templates", **kwargs)` | Compute average templates from the extracted waveforms. |
+| `ext = analyzer.get_extension("extension_name")` | Get a computed extension (e.g., "waveforms") from the analyzer. |
+| `ext.get_data()` | Get the raw data from an extension object. |
+| `ext.get_waveforms_one_unit(unit_id)` | Get the waveforms for a single specified unit. |
+| `ext.get_unit_template(unit_id, operator)` | Get the template for a single unit (e.g., using "average" or "median"). |
+| `plt.plot(template)` | Plot the average template waveform. |
 
 ---
 
-:::{#exm-}
-Load the recoring extractor stored in the directory `"/preprocessed"` and the sorting results stored in the directory `"/results_TDC"`.
+Load the recoring extractor stored in the directory `"openephys_preprocessed"` and the sorting results stored in the directory `"results_SPC"` and create a sorting `analyzer`.
 ```{python}
 rec = si.load("openephys_preprocessed")
-sort = si.read_sorter_folder("results_TDC")
-
-```
-:::
-
-:::{#exr-}
-Load the spike sorting results stored in the directory `"/results_SPC"` and assign it to the variable `sort`.
-:::
-:::{sol.}
-```{python}
 sort = si.read_sorter_folder("results_SPC")
-```
-:::
-
-:::{#exr-}
-Create a sorting analyzer by pairing the sorting results `sort` and the recording `rec`.
-:::
-:::{sol.}
-```{python}
 analyzer = si.create_sorting_analyzer(sort, rec)
 ```
-:::
+
 
 :::{#exm-}
 Randomly sample up to `300` spikes from every unit.
+:::
 ```{python}
 analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=300)
 ```
-:::
 
 :::{#exm-}
 Get the `"random_spikes"` extension from the `analyzer` and print the total number of spikes sampled.
+:::
 ```{python}
 ext = analyzer.get_extension("random_spikes")
 spike_indices = ext.get_data()
 print("N_spikes = ", len(spike_indices))
 ```
-:::
 
 :::{#exr-}
 Randomly sample up to `500` spikes per unit and print the total number of spikes sampled. 
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 analyzer.compute("random_spikes", method="uniform", max_spikes_per_unit=500)
 ext = analyzer.get_extension("random_spikes")
@@ -116,11 +106,17 @@ spike_indices = ext.get_data()
 print("N_spikes = ", len(spike_indices))
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
-Randomly sample spikes and use `method="all"` to get **all** of the spikes (omit the `max_spikes_per_unit` argument). Then, print the total number of spikes sampled.
+Randomly sample spikes and use `method="all"` to get of the spikes (omit the `max_spikes_per_unit` argument). Then, print the total number of spikes sampled.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 analyzer.compute("random_spikes", method="all")
 ext = analyzer.get_extension("random_spikes")
@@ -128,341 +124,379 @@ spike_indices = ext.get_data()
 print("N_spikes = ", len(spike_indices))
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exm-}
-Compute the waveforms for all of the spikes using the signal between `2` milliseconds before and `3` milliseconds after each spike. 
+Compute the `"waveforms"` for all of the spikes using the `ms_before = 2` and `ms_after=3` milliseconds after each spike. 
+:::
 ```{python}
 analyzer.compute("waveforms", ms_before=2, ms_after=3)
 ```
-:::
 
 :::{#exm-}
 Get the `"waveforms"` extension from the `analyzer`, then get the array of waveforms for unit `3` and its `.shape` (dimensions represent spikes, samples and channels).
+:::
 ```{python}
 ext = analyzer.get_extension("waveforms")
 wfs = ext.get_waveforms_one_unit(unit_id=3)
 wfs.shape
 ```
-:::
 
 :::{#exr-}
-Compute the waveforms for all of the spikes using the signal between `1` millisecond before and `3` milliseconds after each spike. Then, get the waveforms for unit `3` and print their `.shape`.
+Compute the `"waveforms"` for all of the spikes using the `ms_before = 1` and `ms_after=2` milliseconds after each spike.  Then, get the waveforms for unit `3` and print their `.shape`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-analyzer.compute("waveforms", ms_before=1, ms_after=3)
+analyzer.compute("waveforms", ms_before=1, ms_after=2)
 ext = analyzer.get_extension("waveforms")
 wfs = ext.get_waveforms_one_unit(unit_id=3)
 wfs.shape
 ```
 :::
-
-:::{#exr-}
-Compute the waveforms for all of the spikes using the signal between `1` millisecond before and `2` milliseconds after each spike. Then, get the waveforms for three different units and print their `.shape`.
-:::
-:::{sol.}
+:::{.direction}
 ```{python}
-analyzer.compute("waveforms", ms_before=1, ms_after=3)
-ext = analyzer.get_extension("waveforms")
-for unit_id in [5, 34, 103]:
-    wfs = ext.get_waveforms_one_unit(unit_id=unit_id)
-    print(wfs.shape)
+#| echo: false
+print('​')
 ```
 :::
+
 
 :::{#exm-}
 Compute the `"templates"` for the extracted `"waveforms"` using the `"average"` operator.
+:::
 ```{python}
 analyzer.compute("templates", operators=["average"])
 ```
-:::
 
 :::{#exm-}
-Get the template for unit `3` and print its shape.
+Get the `"average"` template for unit `3` and print its shape.
+:::
 ```{python}
 ext = analyzer.get_extension("templates")
 template = ext.get_unit_template(unit_id=3, operator="average")
-template.shape
+plt.plot(template);
 ```
-:::
-
-:::{#exm-plot_template}
-Get the `"ms_before"` and `"ms_after"` from `ext.params` and use it to create a vector of time points for the `template`. Then plot the `template` and label the axes.
-```{python}
-ms_before = ext.params["ms_before"]
-ms_after = ext.params["ms_after"]
-time_ms = np.linspace(start=-1 * ms_before, stop=ms_after, num=template.shape[0])
-plt.plot(time_ms, template)
-plt.xlabel("Time [ms]")
-plt.ylabel("Voltage [muV]")
-```
-:::
 
 :::{#exr-}
-Plot the `template` for unit `10` as demonstrated in @exm-plot_template
+Compute the `"templates"` for the extracted `"waveforms"` using the `"median"` operator. 
 :::
-:::{sol.}
-```{python}
-template = ext.get_unit_template(unit_id=10, operator="average")
-ms_before = ext.params["ms_before"]
-ms_after = ext.params["ms_after"]
-time_ms = np.linspace(start=-1 * ms_before, stop=ms_after, num=template.shape[0])
-plt.plot(time_ms, template)
-plt.xlabel("Time [ms]")
-plt.ylabel("Voltage [muV]")
-```
-:::
-
-:::{#exr-}
-Compute the `"templates"` for the extracted `"waveforms"` using the `"median"` operator. Then, get the `template` for unit `10` and plot it.
-:::
-:::{sol.}
+:::{.sol}
 ```{python}
 analyzer.compute("templates", operators=["median"])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Get the `"median"` template for unit `3` and print its shape.
+:::
+:::{.sol}
+```{python}
 ext = analyzer.get_extension("templates")
-template = ext.get_unit_template(unit_id=10, operator="median")
-ms_before = ext.params["ms_before"]
-ms_after = ext.params["ms_after"]
-time_ms = np.linspace(start=-1 * ms_before, stop=ms_after, num=template.shape[0])
-plt.plot(time_ms, template)
-plt.xlabel("Time [ms]")
-plt.ylabel("Voltage [muV]")
+template = ext.get_unit_template(unit_id=3, operator="median")
+plt.plot(template);
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 
 ## Localizing Detected Units
 
+Knowing where a unit is physically located on the probe is crucial for validating sorting results (e.g., a single neuron should be localized in space) and for any spatial analysis of neural activity. SpikeInterface can estimate the position of each unit by analyzing the amplitude of its average waveform across the different electrode channels. In this section we will explore computing unit locations using various methods, such as "center of mass" and "monopolar triangulation," and visualizing these locations in 2D and 3D space relative to the probe geometry.
+
 | Code | Description |
-| --- | --- |
-| `si.compute_unit_locations(analyzer, method)` | Compute unit locations for a given sorting `analyzer` with the given `method` |
-| `ax = plt.subplot(projection='3d')` | Create a 3-dimensional plot and assign the returned axes object to a variable `ax` |
-| `ax.scatter(x,y,z)` | Draw a scatter plot to the axes object `ax` |
-| `ax.set(xlim=(-1,1), ylim=(-2,2))` | Set the x- and y-limits for `ax` |
+|---|---|
+| `si.plot_unit_waveforms(analyzer, **kwargs)` | Create an interactive plot showing unit waveforms on the probe. |
+| `unit_locations = si.compute_unit_locations(analyzer, method)` | Compute unit locations using a specified method (e.g., "center_of_mass"). |
+| `probe = rec.get_probe()` | Retrieve the probe information from a recording object. |
+| `plot_probe(probe)` | Plot the geometry of the probe. |
+| `plt.scatter(x, y)` | Create a 2D scatter plot of x and y coordinates. |
+| `ax = plt.subplot(projection='3d')` | Create a 3-dimensional plot axis. |
+| `ax.scatter(x, y, z)` | Create a 3D scatter plot of x, y, and z coordinates. |
+| `ax.set(xlim=..., ylim=...)` | Set the x and y axis limits for a plot. |
 
 ---
 
-:::{#exr-}
-Run the cell below to create an interactive widget that shows, for each unit, the waveforms and the electrode locations where they were recorded. Select five different neurons and observe the corresponding waveforms. Can you infer the location of the units from the recorded waveforms?
+Run the cell below to create an interactive widget that shows, for each unit, the waveforms and the electrode locations where they were recorded.
 ```{python}
+# | eval: false
 %matplotlib widget
 si.plot_unit_waveforms(analyzer, backend="ipywidgets")
 %matplotlib inline
 ```
-:::
 
 :::{#exm-}
 Compute the unit locations using the `"center_of_mass"` method and print the shape of the returned `unit_locations`.
+:::
 ```{python}
 unit_locations = si.compute_unit_locations(analyzer, method="center_of_mass")
 unit_locations.shape
 ```
-:::
 
-:::{#exr-}
-Compute the unit locations using the `"grid_convolution"` method and print the shape of the returned `unit_locations`.
+:::{#exm-}
+Get the probe from `rec` and plot it together with the `x` and `y` `unit_locations`.
 :::
-:::{sol.}
 ```{python}
-unit_locations = si.compute_unit_locations(analyzer, method="monopolar_triangulation")
-unit_locations.shape
+probe = rec.get_probe()
+plot_probe(probe)
+x = unit_locations[:, 0]
+y = unit_locations[:, 1]
+plt.scatter(x, y)
+plt.xlim(-400, 400)
+plt.ylim(0, 800)
 ```
-:::
 
 :::{#exr-}
 Compute the unit locations using the `"monopolar_triangulation"` method and print the shape of the returned `unit_locations`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 unit_locations = si.compute_unit_locations(analyzer, method="monopolar_triangulation")
 unit_locations.shape
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the `probe` together with the `x` and `y` `unit_locations`.
+:::
+:::{.sol}
+```{python}
+probe = rec.get_probe()
+plot_probe(probe)
+x = unit_locations[:, 0]
+y = unit_locations[:, 1]
+plt.scatter(x, y)
+plt.xlim(-400, 400)
+plt.ylim(0, 800)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exm-}
-Create a 3-dimensional scatter plot for the `unit_locations` computed with the `"monopolar_triangulation"` method (re-compute the locations if necessary). Use equal scaling on the x- and y-axis.
+Create a 3D plot of the `x`, `y` and `z` `unit_locations`.
+:::
 ```{python}
-# unit_locations = si.compute_unit_locations(analyzer, method="monopolar_triangulation")
 x = unit_locations[:, 0]
 y = unit_locations[:, 1]
 z = unit_locations[:, 2]
-ax = plt.subplot(projection='3d')
-ax.scatter(x, y, z) # c=z colors by z-value
-ax.set_xlim(-400, 400)
-ax.set_ylim(0, 800)
+ax = plt.subplot(projection="3d")
+ax.scatter(x, y, z)
+ax.set(xlim=(-400, 400), ylim=(0, 800))
 ```
-:::
 
 :::{#exr-}
-Create a 3-dimensional scatter plot for the `unit_locations` computed with the `"grid_convolution"` method (re-compute the locations if necessary). Use equal scaling on the x- and y-axis.
+Compute the unit locations using the `"grid_convolution"` method and print the shape of the returned `unit_locations`.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 unit_locations = si.compute_unit_locations(analyzer, method="grid_convolution")
-x = unit_locations[:, 0]
-y = unit_locations[:, 1]
-z = unit_locations[:, 2]
-ax = plt.subplot(projection='3d')
-ax.scatter(x, y, z) # c=z colors by z-value
-ax.set(xlim=(-400, 400), ylim=(0, 800))
+unit_locations.shape
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Create a 2-dimensional scatter plot (without using `projection='3d'`) for the `unit_location` computed with the `"center_of_mass"` method (re-compute the locations if necessary). Use equal scaling
+Create a 3D plot of the `x`, `y` and `z` `unit_locations`.
 :::
-
+:::{.sol}
 ```{python}
-unit_locations = si.compute_unit_locations(analyzer, method="center_of_mass")
 x = unit_locations[:, 0]
 y = unit_locations[:, 1]
-ax = plt.subplot()
-ax.scatter(x, y)  # c=z colors by z-value
+z = unit_locations[:, 2]
+ax = plt.subplot(projection="3d")
+ax.scatter(x, y, z)
 ax.set(xlim=(-400, 400), ylim=(0, 800))
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
 
 ## Curating Units with Quality Metrics
 
+Spike sorting algorithms are not perfect; they often produce units that represent noise, artifacts, or a mix of multiple neurons (multi-unit activity). Therefore, a critical step in the workflow is to compute quality metrics to automatically curate the results and identify high-quality, well-isolated single units. SpikeInterface provides many metrics, including signal-to-noise ratio (SNR) and Inter-Spike Interval (ISI) violations. In this section, you will learn how to compute these metrics and use them to filter the sorting output, keeping only the units that meet your quality criteria.
+
 | Code | Description |
-| --- | --- |
-| `analyzer.compute(extension_name)` | Compute a given extension for the sorting `analyzer` (additional argments depend on the extension) |
-| `ext=analyzer.get_extension(extension_name)` | Get the extension with the given name from the sorting `analyzer` |
-| `ext.get_data()` | Get data for the extension `ext` |
+|---|---|
+| `analyzer.compute("noise_levels")` | Compute the noise level on each channel, a prerequisite for SNR. |
+| `analyzer.compute("quality_metrics", metric_names=[...])` | Compute specified quality metrics for all units. |
+| `ext = analyzer.get_extension("quality_metrics")` | Get the computed quality metrics from the analyzer. |
+| `df = ext.get_data()` | Get the quality metrics as a pandas DataFrame. |
+| `plt.hist(df["metric_name"])` | Plot a histogram of a specific quality metric's distribution. |
+| `unit_ids = analyzer.unit_ids[df["metric_name"] > value]` | Select unit IDs that satisfy a condition based on a quality metric. |
+| `curated_units = sort.select_units(unit_ids=unit_ids)` | Create a new, curated sorting object containing only the selected units. |
+| `curated_units.save(folder="...", overwrite=True)` | Save the curated sorting results to a new folder. |
 
 ---
 
 :::{#exm-}
-Compute the `"noise_levels"` and `"quality_metrics"` extension with the metrics `"snr"` and `"num_spikes"`.
+Compute the `"noise_levels"` and `"quality_metrics"` extension with the metrics `"snr"` and `"num_spikes"`. Then, get the extension data and print the data frame.
+:::
 ```{python}
 analyzer.compute("noise_levels")
 analyzer.compute("quality_metrics", metric_names=["snr", "num_spikes"])
-```
-:::
-
-:::{#exm-}
-Extract the computed quality metrics for each unit as a pandas data frame and plot the `"snr"` as a histogram
-```{python}
 ext = analyzer.get_extension("quality_metrics")
 df = ext.get_data()
-plt.hist(df["snr"])
-plt.xlabel("SNR")
-plt.ylabel("Count")
+df
 ```
-:::
 
 :::{#exr-}
-Plot the number of spikes (`"num_spikes"`) as a histogram.
+Plot the distribution of `"snr"` in a histogram.
+:::
+:::{.sol}
 ```{python}
-plt.hist(df["num_spikes"])
-plt.xlabel("Spike Count")
-plt.ylabel("Count")
+plt.hist(df["snr"])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Compute the `"quality_metrics"` extension with the `"isi_violation"` metric. Then, extract the data frame and plot a histogram for the `"isi_violations_count"`.
+Compute the `"quality_metrics"` extension with the `"isi_violation"` metric, get the extension data and print the data frame. 
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 analyzer.compute("quality_metrics", metric_names=["isi_violation"])
 ext = analyzer.get_extension("quality_metrics")
 df = ext.get_data()
-plt.hist(df["isi_violations_count"])
-plt.xlabel("ISI Violations")
-plt.ylabel("Count")
+df
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
-Plot a histogram for the `"isi_violatios_ratio"` (HINT: you can use the `range` argument of the `plt.hist()` funtion to restrict the range of the histrogram bins to exclude outliers.
+Plot the distribution of `"isi_violation_count"` in a histogram.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
-plt.hist(df["isi_violations_ratio"], range=(0,10))
-plt.xlabel("ISI Violation Ratio")
-plt.ylabel("Count")
+plt.hist(df["isi_violations_count"])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exm-}
 Get the units with a SNR above 10.
+:::
 ```{python}
 unit_ids = analyzer.unit_ids[df["snr"]>10]
 unit_ids
 ```
-:::
-
-:::{#exm-}
-Get the units with a SNR above 10 AND at least 200 recorded spikes.
-```{python}
-unit_ids = analyzer.unit_ids[(df["snr"]>10) & (df["num_spikes"]>=200)]
-unit_ids
-```
-:::
 
 :::{#exr-}
 Get the units with an `"isi_violations_ratio"` below 4.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 unit_ids = analyzer.unit_ids[(df["isi_violations_ratio"]<4)]
 unit_ids
 ```
 :::
-
-:::{#exr-}
-Get the units with an `"isi_violations_ratio"` below 3 AND at least 250 recorded spikes
-:::
-:::{sol.}
+:::{.direction}
 ```{python}
-unit_ids = analyzer.unit_ids[(df["isi_violations_ratio"]<3) & (df["num_spikes"]>=250)]
-unit_ids
+#| echo: false
+print('​')
 ```
 :::
 
-
-:::{#exm-}
-Select the curated unit_ids, save the new sorting object and load it for verification.
+:::{#exr-}
+Use `sort.select_units` to select the filtered `unit_ids` and return the `curated_units`. Then use `curated_units.save()` to save them.
+:::
+:::{.sol}
 ```{python}
-sort_curated = sort.select_units(unit_ids=unit_ids)
-sort_curated.save(folder="sorting_curated", overwrite=True)
+curated_units = sort.select_units(unit_ids=unit_ids)
+curated_units.save(folder="sorting_curated", overwrite=True)
 si.load("sorting_curated")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 ## Compare Different Sorters
 
+Different spike sorters use different algorithms and may produce different results on the same dataset. By comparing the outputs of multiple sorters, we can identify a "consensus" set of units found by all (or most) of them, which increases our confidence in their validity. This comparison also highlights where sorters disagree, pointing to units that may be difficult to sort or require manual inspection. SpikeInterface provides convenient tools to compare sorters and visualize their agreement. In this section, you will learn how to compare sorters and interpret the resulting agreement matrices and summary plots.
+
 | Code | Description |
-| --- | --- | 
-| `comp = si.compare_two_sorters(sorter1, sorter2, "name1", "name2")` | Compare two sorters with given names, returning a sorter comparison object |
-| `si.plot_agreement_matrix(comp)` | Plot the agreement matrix for a given sorter comparison |
-| `multi_comp = si.compare_multiple_sorters(sorter_list, name_list)` | Compare a list of multiple sorters (with a corresponding list of names), returning a multiple sorter comparison object |
-| `si.plot_multicomparison_agreement(multi_comp)` | Plot a pie chart that displays the agreement between the sorters |
-| `si.plot_multicomparison_agreement_by_sorter(multi_comp)` | Plot a pie chart that displays the agreement between the sorters separately for each sorter |
+|---|---|
+| `comp = si.compare_two_sorters(...)` | Compare two sorters, returning a comparison object. |
+| `si.plot_agreement_matrix(comp, **kwargs)` | Plot the agreement matrix for a pairwise sorter comparison. |
+| `multi_comp = si.compare_multiple_sorters(...)` | Compare a list of multiple sorters, returning a multi-comparison object. |
+| `si.plot_multicomparison_agreement(multi_comp)` | Plot a pie chart summarizing the agreement between multiple sorters. |
+| `si.plot_multicomparison_agreement_by_sorter(multi_comp)` | Plot agreement summaries broken down by each individual sorter. |
 
-
-:::{#exm-}
-Load the sorting results from Spikingcircus and Kilosort4 and assign them 
+Load the sorting results from Spykingcircus, Kilosort4 and Tridesclous.
 ```{python}
 sorting_SPC = si.read_sorter_folder("results_SPC")
 sorting_KS4 = si.read_sorter_folder("results_KS4")
+sorting_TDC = si.read_sorter_folder("results_TDC")
 ```
-:::
 
 :::{#exm-}
 Compare the results from the Spikingcircus and Kilosort4 sorters using the `"count"` agreement methods and plot the agreement matrix. A clearly visible diagonal indicates that the sorters agree on a given unit.
+:::
 ```{python}
 comp = si.compare_two_sorters(
     sorting_SPC, sorting_KS4, "Spikingcircus", "Kilosort4", agreement_method="count"
 )
 si.plot_agreement_matrix(comp, unit_ticks=False)
 ```
-:::
 
 :::{#exr-}
 Compare the results from the Spikingcircus and Kilosort4  sorters using the `"distance"` agreement methods and plot the agreement matrix. 
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 comp = si.compare_two_sorters(
     sorting_SPC, sorting_KS4, "SPC", "KS4", agreement_method="distance"
@@ -470,11 +504,17 @@ comp = si.compare_two_sorters(
 si.plot_agreement_matrix(comp, unit_ticks=False)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Load the results from the Tridesclous sorter and compare them to the results from Spikingcircus by plotting the agreement matrix.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 sorting_TDC = si.read_sorter_folder("results_TDC")
 comp = si.compare_two_sorters(
@@ -483,9 +523,16 @@ comp = si.compare_two_sorters(
 si.plot_agreement_matrix(comp, unit_ticks=False)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exm-}
 Compare the results from all three sorters using the `"count"` agreement method.
+:::
 ```{python}
 multi_comp = si.compare_multiple_sorters(
     [sorting_SPC, sorting_KS4, sorting_TDC],
@@ -493,19 +540,26 @@ multi_comp = si.compare_multiple_sorters(
     agreement_method="count",
 )
 ```
-:::
 
-:::{#exm-}
-Plot the mutlicomparison agreement.
+:::{#exr-}
+Use `si.plot_multicomparison_agreement` to plot the `multi_comp`.
+:::
+:::{.sol}
 ```{python}
 si.plot_multicomparison_agreement(multi_comp)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
 Compare the results from all three sorters using the `"distance"` agreement method.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 multi_comp = si.compare_multiple_sorters(
     [sorting_SPC, sorting_KS4, sorting_TDC],
@@ -514,21 +568,39 @@ multi_comp = si.compare_multiple_sorters(
 )
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Plot the mutlicomparison agreement.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 si.plot_multicomparison_agreement(multi_comp)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 :::{#exr-}
 Plot the mutlicomparison agreement separately for each sorter.
 :::
-:::{sol.}
+:::{.sol}
 ```{python}
 si.plot_multicomparison_agreement_by_sorter(multi_comp)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::

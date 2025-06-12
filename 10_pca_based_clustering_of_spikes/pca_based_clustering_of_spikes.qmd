@@ -1,4 +1,17 @@
+---
+title: "Feature Extraction and Waveform Clustering"
+engine: Jupyter
+format: ipynb
+filters:
+    - assign
+number-sections: true
+number-depth: 2
+---
 
+
+## Preparation
+
+Import the modules required for this notebook
 ```{python}
 import numpy as np
 import pandas as pd
@@ -7,7 +20,6 @@ from sklearn.decomposition import PCA
 from sklearn.mixture import GaussianMixture
 ```
 
-## Preparation
 
 Download the data required for this session
 ```{python}
@@ -22,25 +34,37 @@ with open(fname, "wb") as file:
 print("Done!")
 ```
 
-## Extraing Waveform Features with PCA
+## Extracting Waveform Features with PCA
+
+In principal, we could run spike sorting on the raw spike waveforms. However, because there are too many features (i.e., time points) in the data and they are highly correlated, the sorting process would be very inefficient. Thus, we'll have to extract features from the waveforms and use those to sort the spikes. Principal Component Analysis (PCA) is a method that allows us to extract these features in an automated and unsupervised manner. PCA will give us a number of uncorrelated components that provide a concise description of our data. This way, we can drastically reduce the number of dimensions while keeping the most relevant information. In this section, we will learn how to apply PCA to the raw spike waveforms.
 
 | Code | Description |
-| --- | --- |
-| `x = np.load("data.npy")` | Load the file `"data.npy"` and assign its content to the variable `x` |
-| `pca=PCA(n_components=n)` | Create an instance of the `PCA` object with `n` components |
-| `X_transformed=pca.fit_transform(X)` | Fit the `pca` to the matrix `X`, transform the data and assign the result to a new variable `X_transformed` |
-| `pca.explained_variance_ratio_` | Get the ratio of variance explained by each principle component in the fitted `pca` |
-| `np.cumsum(pca.explained_variance_ratio_)` | Calculate the cumulative sum of the ratio of variance explained by the principle components |
+|---|---|
+| `waveforms = np.load("data.npy")` | Load a NumPy array from a `.npy` file. |
+| `waveforms.shape` | Get the dimensions (shape) of the `waveforms` NumPy array. |
+| `X = waveforms[:, :, 0]` | Select all data from the first channel (index 0) of the 3D `waveforms` array. |
+| `pca = PCA(n_components=n)` | Create a Principal Component Analysis (PCA) object to find `n` components. |
+| `X_transformed = pca.fit_transform(X)` | Fit the PCA model to data `X` and apply dimensionality reduction. |
+| `pca.explained_variance_ratio_` | Get the percentage of variance explained by each principal component. |
+| `plt.plot(data)` | Plot the values in the `data` array as a line graph. |
+| `np.cumsum(array)` | Calculate the cumulative sum of the elements in an array. |
+| `sum(array[:n])` | Calculate the sum of the first `n` elements of an array. |
 
 ---
 
 :::{#exr-}
-Load the array of of spike waveforms stored in `"../data/spike_waveforms.npy"`, assign it to a variable `waveforms` print its `.shape`. How many spikes are stored in the array?
+Load the array of of spike waveforms stored in `"spike_waveforms.npy"`, assign it to a variable `waveforms` print its `.shape`. How many spikes are stored in the array?
 :::
 :::{.sol}
 ```{python}
-waveforms = np.load("../data/spike_waveforms.npy")
+waveforms = np.load("spike_waveforms.npy")
 waveforms.shape
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -64,6 +88,12 @@ X_transformed = pca.fit_transform(X)
 print(X.shape, X_transformed.shape)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Use `PCA` with `n_components=15` to transform the spike waveforms recorded at the first channel. Compare the `.shape` of the original and the transformed data.
@@ -76,12 +106,24 @@ X_transformed = pca.fit_transform(X)
 print(X.shape, X_transformed.shape)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 What error message do you observe when you try to apply `PCA` with `n_components=40`?
 :::
 :::{.sol}
 `ValueError: n_components=40 must be between 0 and min(n_samples,n_features)=30`
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
 :::
 
 :::{#exr-}
@@ -90,6 +132,12 @@ Plot the ratio of variance explained by the PCA components (i.e. `pca.explained_
 :::{.sol}
 ```{python}
 plt.plot(pca.explained_variance_ratio_)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -102,14 +150,26 @@ Compute the cumulative ratio of explained variance using `np.cumsum()` and plot 
 plt.plot(np.cumsum(pca.explained_variance_ratio_))
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
-What ratio of the variance is explained by the first three components (i.e. what is the `sum()` of the first three element of `.explained_varaince_ratio_`?) and how many components are required to account for over 99% of varaince?
+What ratio of the variance is explained by the first three components (i.e. what is the `sum()` of the first three elements of `.explained_variance_ratio_`?) and how many components are required to account for over 99% of variance?
 :::
 :::{.sol}
 ```{python}
 print(sum(pca.explained_variance_ratio_[:3]))
 print(sum(pca.explained_variance_ratio_[:8]))
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -124,13 +184,27 @@ X_transformed = pca.fit_transform(X)
 plt.plot(np.cumsum(pca.explained_variance_ratio_))
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
-## Visualizing Principle Components
+## Visualizing Principal Components
+
+PCA is a powerful technique, but its components can be abstract. To build intuition, it's helpful to visualize what these components represent in relation to the original data. In this section, we will plot the principal components themselves to see what waveform shapes they capture. We will also use the inverse PCA transformation to reconstruct waveforms from a limited number of components, which demonstrates how much information is retained. Finally, we will plot the transformed data in the new low-dimensional "PCA space," which should already begin to reveal the distinct clusters of spikes we aim to identify.mprehend. In this section, we are going to visualize the extracted components and compare them to the original waveform to understand how they relate to each other. We'll also apply PCA to transform the original waveforms and plot the transformed waveforms in the new PCA-space. This visualization should already reveal some of the clusters that we want to identify later.
 
 | Code | Description |
-| --- | --- |
-| `pca.components_` | Get the components of the fitted `pca` |
-| `X_inverse = pca.inverse_transform(X_transformed)`| Apply the inverse `pca` transformation to `X_transformed` and assign the result to a new variable `X_inverse` |
+|---|---|
+| `pca.components_` | Access the principal components (eigenvectors) from a fitted PCA model. |
+| `X_inverse = pca.inverse_transform(X_transformed)` | Transform data from PCA space back to its original space. |
+| `plt.subplot(rows, cols, index)` | Create a subplot within a grid at a given `index`. |
+| `X.T` | Transpose the matrix `X`, swapping its rows and columns. |
+| `np.zeros((d1, d2, d3))` | Create a new NumPy array with specified dimensions, filled with zeros. |
+| `plt.scatter(x, y, s=1)` | Create a scatter plot of `x` vs. `y` with a marker size `s` of 1. |
+| `plt.xlabel("label")` | Set the label for the x-axis of a plot. |
+| `plt.ylabel("label")` | Set the label for the y-axis of a plot. |
 
 ---
 
@@ -160,6 +234,12 @@ plt.subplot(3, 1, 3)
 plt.plot(pca.components_[2])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Fit a `PCA` with `n_components=3` to the waveforms recorded at the third channel and plot the first component, along with the first 100 recorded waveforms.
@@ -173,6 +253,12 @@ plt.subplot(2, 1, 1)
 plt.plot(X[:100].T, linewidth=0.5)
 plt.subplot(2, 1, 2)
 plt.plot(pca.components_[0])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -197,6 +283,12 @@ plt.plot(X[6])
 plt.plot(X_inverse[6])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Re-compute the `PCA` and increase the number of `n_components`, then `fit_transform` and `inverse_transform` the data. How many components do you need so the original data `X` and `X_inverse` become indistinguishable?
@@ -211,6 +303,12 @@ plt.plot(X[6])
 plt.plot(X_inverse[6])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Complete the `for` loop below by computing `X_transformed` for the spike waveforms `X` at each channel `i`.
@@ -220,13 +318,13 @@ Complete the `for` loop below by computing `X_transformed` for the spike wavefor
 n_components = 3
 pca = PCA(n_components=n_components)
 n_spikes = waveforms.shape[0]
-n_channels = waveforms,shape[-1]
+n_channels = waveforms.shape[-1]
 waveforms_transformed = np.zeros((n_spikes, n_components, n_channels))
 
-for i_ch in range(n_channels):
+for i in range(n_channels):
     X = waveforms[:, :, i]
     X_transformed = # your code here 
-    waveforms_transformed[:, :, i_ch] = X_transformed
+    waveforms_transformed[:, :, i] = X_transformed
 ```
 :::{.sol}
 ```{python}
@@ -239,6 +337,12 @@ for i in range(n_channels):
     X = waveforms[:, :, i]
     X_transformed = pca.fit_transform(X)
     waveforms_transformed[:, :, i] = X_transformed
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -258,7 +362,13 @@ Plot the amplitude of the 1st PCA feature at channel 1 against the amplitude at 
 ```{python}
 plt.scatter(waveforms_transformed[:, 0, 0], waveforms_transformed[:, 0, 2], s=1)
 plt.xlabel("Ch 1 Amplitude [a.u.]")
-plt.ylabel("Ch 2 Amplitude [a.u.]")
+plt.ylabel("Ch 3 Amplitude [a.u.]")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -268,19 +378,28 @@ Plot the amplitude of the 1st PCA feature at channel 3 against the amplitude at 
 :::{.sol}
 ```{python}
 plt.scatter(waveforms_transformed[:, 0, 2], waveforms_transformed[:, 0, 3], s=1)
-plt.xlabel("Ch 1 Amplitude [a.u.]")
-plt.ylabel("Ch 2 Amplitude [a.u.]")
+plt.xlabel("Ch 3 Amplitude [a.u.]")
+plt.ylabel("Ch 4 Amplitude [a.u.]")
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
 ## Clustering Spikes with Gaussian Mixture Models
 
+Now that we have extracted low-dimensional features from our waveforms using PCA, we can perform clustering to group spikes into putative single units. We will use a Gaussian Mixture Model (GMM), a probabilistic model that assumes the data is generated from a mixture of a finite number of Gaussian distributions with unknown parameters. A key challenge in clustering is choosing the right number of clusters. To address this, we will use the Bayesian Information Criterion (BIC), a model selection tool that balances model fit with model complexity. A lower BIC score indicates a better model, helping us avoid overfitting by penalizing models with too many clusters.
+
 | Code | Description |
-| --- | --- |
-| `gmm=GaussianMixture(n_components)` | Create a `GaussianMixture` model with `n` components |
-| `gmm.fit(X)` | Fit the gaussian mixture model `gmm` to the data matrix `X` |
-| `gmm.score(X)` | Compute the `score` (i.e. the log-likelihood) of the fitted model `gmm` on the data `X` |
-| `gmm.bic(X)` | Compute the Baysian Information Criterion `bic` of the fitted model `gmm` on the data `X` |
+|---|---|
+| `X.reshape(-1, n_cols, order="F")` | Reshape an array into a 2D matrix with `n_cols` columns. |
+| `gmm = GaussianMixture(n_components=n)` | Create a Gaussian Mixture Model (GMM) object to find `n` clusters. |
+| `gmm.fit(X)` | Fit the GMM to the data `X` to learn the cluster parameters. |
+| `gmm.score(X)` | Compute the average log-likelihood of the data `X` under the model. |
+| `gmm.bic(X)` | Compute the Bayesian Information Criterion (BIC) for the fitted model. |
 
 :::{#exr-}
 Execute the cell below to `.reshape()` the 3-dimensional matrix `waveforms_transformed` into a 2-dimensional matrix `X` by concatenating the components and channels dimension. What is the new `.shape` of `X`?
@@ -291,6 +410,12 @@ X = waveforms_transformed.reshape(-1, n_components * n_channels, order="F")
 :::{.sol}
 ```{python}
 X.shape
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -313,6 +438,12 @@ gmm.fit(X[:1000])
 gmm.score(X[:1000])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 
 :::{#exr-}
@@ -326,6 +457,12 @@ gmm.score(X[:1000])
 ```
 The largest number of components is equal to the number of data points, i.e. 1000
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Apply a `GaussianMixture` model with `n_components=10` to the first `1000` spikes in `waveforms` and compute the Bayesian Information Criterion `.bic()`.
@@ -337,6 +474,12 @@ gmm.fit(X[:1000])
 gmm.bic(X[:1000])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Apply a `GaussianMixture` model with `n_components=5` to the first `1000` spikes in `waveforms` and compute the Bayesian Information Criterion `.bic()`. Does this model perform better or worse than the one with `n_components=10` according to the BIC (HINT: a lower BIC indicates a better model)?
@@ -346,6 +489,12 @@ Apply a `GaussianMixture` model with `n_components=5` to the first `1000` spikes
 gmm = GaussianMixture(n_components=5)
 gmm.fit(X[:1000])
 gmm.bic(X[:1000])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -362,6 +511,12 @@ gmm.fit(X[:8000])
 print(gmm.bic(X[:8000]))
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 Fit a `GaussianMixture` model with `n_components=13` (which is the optimal number of components according to BIC) to the whole data.
@@ -374,13 +529,28 @@ gmm = GaussianMixture(
 gmm.fit(X)
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 ## Predicting and Inspecting Cluster Labels
 
+With an optimal GMM fitted to our data, we can now assign each spike to a specific cluster. These cluster assignments are our predicted single units. To validate the quality of our clustering, we will inspect the results both quantitatively and visually. We will examine the probability of each spike's cluster assignment to gauge the model's confidence. Finally, we will visualize the clusters in the PCA feature space, coloring each spike by its assigned label to see if the clusters are well-separated, which is a key indicator of successful spike sorting.
+
 | Code | Description |
-| --- | --- |
-| `labels=gmm.predict(X)` | Assign a cluster label to each observation in `X` using the fitted model `gmm` |
-| `cluster_probs = gmm.predict_proba(X)` | For each observation in `X` get the probability that it belongs to any cluster in the model `gmm` |
+|---|---|
+| `spike_labels = gmm.predict(X)` | Predict the cluster label for each sample in `X` using the fitted GMM. |
+| `cluster_probs = gmm.predict_proba(X)` | Predict the probability of each sample belonging to each cluster. |
+| `np.unique(array)` | Find and return the unique elements in an array. |
+| `len(array)` | Get the number of elements in an array or list. |
+| `sum(array == value)` | Count the number of elements in an array equal to a specific `value`. |
+| `plt.hist(data)` | Create a histogram to visualize the distribution of values in `data`. |
+| `array.max(axis=1)` | Find the maximum value for each row of a 2D array. |
+| `plt.scatter(x, y, s=5, color="gray")` | Create a scatter plot with a specified marker size `s` and `color`. |
+| `plt.legend()` | Display a legend on the plot to identify different data series. |
 
 ---
 
@@ -393,6 +563,12 @@ spike_labels = gmm.predict(X)
 spike_labels
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 How many unique `spike_labels` are there?
@@ -400,6 +576,12 @@ How many unique `spike_labels` are there?
 :::{.sol}
 ```{python}
 print(len(np.unique(spike_labels)))
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -412,6 +594,12 @@ cluster_probs = gmm.predict_proba(X)
 cluster_probs.shape
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 What is the `spike_label` assigned to the first spike? How many spikes have been assigned to the same label?
@@ -420,6 +608,12 @@ What is the `spike_label` assigned to the first spike? How many spikes have been
 ```{python}
 print(spike_labels[0])
 sum(spike_labels==spike_labels[0])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -431,6 +625,12 @@ Plot the probability of cluster membership `cluster_prob` for the first spike as
 plt.hist(cluster_probs[0])
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exr-}
 What is the sum of all `cluster_probs` for a the first spike?
@@ -438,6 +638,12 @@ What is the sum of all `cluster_probs` for a the first spike?
 :::{.sol}
 ```{python}
 sum(cluster_probs[0])
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::
 
@@ -449,9 +655,15 @@ Get the largest cluster membership probability for each spike (i.e. `cluster_pro
 plt.hist(cluster_probs.max(axis=1))
 ```
 :::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
 
 :::{#exm-}
-PLot the amplitude of PCA feature at channel 1 (`X[:, 0, 0]`) against the amplitude at channel 2 (`X[:, 0, 1]`) for the spikes from `clusters=[0, 1, 2, 3]`
+Plot the amplitude of PCA feature at channel 1 (`X[:, 0, 0]`) against the amplitude at channel 2 (`X[:, 0, 1]`) for the spikes from `clusters=[0, 1, 2, 3]`
 :::
 ```{python}
 clusters = [0, 1, 2, 3]
@@ -465,18 +677,24 @@ for cluster in clusters:
 ```
 
 :::{#exr-}
-PLot the amplitude of PCA feature at channel 1 (`X[:, 0, 0]`) against the amplitude at channel 3 (`X[:, 0, 2]`) for the spikes from `clusters=[0, 1, 2, 3]`.
+Plot the amplitude of PCA feature at channel 1 (`X[:, 0, 0]`) against the amplitude at channel 3 (`X[:, 0, 2]`) for the spikes from `clusters=[0, 1, 2, 3]`.
 :::
 :::{.sol}
 ```{python}
 clusters = [0, 1, 2, 3]
 X = waveforms_transformed
-plt.scatter(X[:, 0, 1], X[:, 0, 3], s=1, color="gray")
+plt.scatter(X[:, 0, 1], X[:, 0, 2], s=1, color="gray")
 for cluster in clusters:
     X = waveforms_transformed[spike_labels == cluster]
     plt.scatter(X[:, 0, 1], X[:, 0, 2], s=1, label=cluster)
-    plt.xlabel("Amplitude Ch 1 [a.u.]")
-    plt.ylabel("Amplitude Ch 2 [a.u.]")
+    plt.xlabel("Amplitude Ch 2 [a.u.]")
+    plt.ylabel("Amplitude Ch 3 [a.u.]")
 plt.legend()
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
 ```
 :::

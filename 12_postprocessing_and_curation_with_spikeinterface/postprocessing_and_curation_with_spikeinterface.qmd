@@ -215,137 +215,6 @@ print('​')
 :::
 
 
-## Localizing Detected Units
-
-Knowing where a unit is physically located on the probe is crucial for validating sorting results (e.g., a single neuron should be localized in space) and for any spatial analysis of neural activity. SpikeInterface can estimate the position of each unit by analyzing the amplitude of its average waveform across the different electrode channels. In this section we will explore computing unit locations using various methods, such as "center of mass" and "monopolar triangulation," and visualizing these locations in 2D and 3D space relative to the probe geometry.
-
-| Code | Description |
-|---|---|
-| `si.plot_unit_waveforms(analyzer, **kwargs)` | Create an interactive plot showing unit waveforms on the probe. |
-| `unit_locations = si.compute_unit_locations(analyzer, method)` | Compute unit locations using a specified method (e.g., "center_of_mass"). |
-| `probe = rec.get_probe()` | Retrieve the probe information from a recording object. |
-| `plot_probe(probe)` | Plot the geometry of the probe. |
-| `plt.scatter(x, y)` | Create a 2D scatter plot of x and y coordinates. |
-| `ax = plt.subplot(projection='3d')` | Create a 3-dimensional plot axis. |
-| `ax.scatter(x, y, z)` | Create a 3D scatter plot of x, y, and z coordinates. |
-| `ax.set(xlim=..., ylim=...)` | Set the x and y axis limits for a plot. |
-
----
-
-Run the cell below to create an interactive widget that shows, for each unit, the waveforms and the electrode locations where they were recorded.
-```{python}
-# | eval: false
-%matplotlib widget
-si.plot_unit_waveforms(analyzer, backend="ipywidgets")
-%matplotlib inline
-```
-
-:::{#exm-}
-Compute the unit locations using the `"center_of_mass"` method and print the shape of the returned `unit_locations`.
-:::
-```{python}
-unit_locations = si.compute_unit_locations(analyzer, method="center_of_mass")
-unit_locations.shape
-```
-
-:::{#exm-}
-Get the probe from `rec` and plot it together with the `x` and `y` `unit_locations`.
-:::
-```{python}
-probe = rec.get_probe()
-plot_probe(probe)
-x = unit_locations[:, 0]
-y = unit_locations[:, 1]
-plt.scatter(x, y)
-plt.xlim(-400, 400)
-plt.ylim(0, 800)
-```
-
-:::{#exr-}
-Compute the unit locations using the `"monopolar_triangulation"` method and print the shape of the returned `unit_locations`.
-:::
-:::{.sol}
-```{python}
-unit_locations = si.compute_unit_locations(analyzer, method="monopolar_triangulation")
-unit_locations.shape
-```
-:::
-:::{.direction}
-```{python}
-#| echo: false
-print('​')
-```
-:::
-
-:::{#exr-}
-Plot the `probe` together with the `x` and `y` `unit_locations`.
-:::
-:::{.sol}
-```{python}
-probe = rec.get_probe()
-plot_probe(probe)
-x = unit_locations[:, 0]
-y = unit_locations[:, 1]
-plt.scatter(x, y)
-plt.xlim(-400, 400)
-plt.ylim(0, 800)
-```
-:::
-:::{.direction}
-```{python}
-#| echo: false
-print('​')
-```
-:::
-
-:::{#exm-}
-Create a 3D plot of the `x`, `y` and `z` `unit_locations`.
-:::
-```{python}
-x = unit_locations[:, 0]
-y = unit_locations[:, 1]
-z = unit_locations[:, 2]
-ax = plt.subplot(projection="3d")
-ax.scatter(x, y, z)
-ax.set(xlim=(-400, 400), ylim=(0, 800))
-```
-
-:::{#exr-}
-Compute the unit locations using the `"grid_convolution"` method and print the shape of the returned `unit_locations`.
-:::
-:::{.sol}
-```{python}
-unit_locations = si.compute_unit_locations(analyzer, method="grid_convolution")
-unit_locations.shape
-```
-:::
-:::{.direction}
-```{python}
-#| echo: false
-print('​')
-```
-:::
-
-:::{#exr-}
-Create a 3D plot of the `x`, `y` and `z` `unit_locations`.
-:::
-:::{.sol}
-```{python}
-x = unit_locations[:, 0]
-y = unit_locations[:, 1]
-z = unit_locations[:, 2]
-ax = plt.subplot(projection="3d")
-ax.scatter(x, y, z)
-ax.set(xlim=(-400, 400), ylim=(0, 800))
-```
-:::
-:::{.direction}
-```{python}
-#| echo: false
-print('​')
-```
-:::
-
 
 ## Curating Units with Quality Metrics
 
@@ -596,6 +465,137 @@ Plot the mutlicomparison agreement separately for each sorter.
 :::{.sol}
 ```{python}
 si.plot_multicomparison_agreement_by_sorter(multi_comp)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+## Localizing Detected Units
+
+Knowing where a unit is physically located on the probe is crucial for validating sorting results (e.g., a single neuron should be localized in space) and for any spatial analysis of neural activity. SpikeInterface can estimate the position of each unit by analyzing the amplitude of its average waveform across the different electrode channels. In this section we will explore computing unit locations using various methods, such as "center of mass" and "monopolar triangulation," and visualizing these locations in 2D and 3D space relative to the probe geometry.
+
+| Code | Description |
+|---|---|
+| `si.plot_unit_waveforms(analyzer, **kwargs)` | Create an interactive plot showing unit waveforms on the probe. |
+| `unit_locations = si.compute_unit_locations(analyzer, method)` | Compute unit locations using a specified method (e.g., "center_of_mass"). |
+| `probe = rec.get_probe()` | Retrieve the probe information from a recording object. |
+| `plot_probe(probe)` | Plot the geometry of the probe. |
+| `plt.scatter(x, y)` | Create a 2D scatter plot of x and y coordinates. |
+| `ax = plt.subplot(projection='3d')` | Create a 3-dimensional plot axis. |
+| `ax.scatter(x, y, z)` | Create a 3D scatter plot of x, y, and z coordinates. |
+| `ax.set(xlim=..., ylim=...)` | Set the x and y axis limits for a plot. |
+
+---
+
+Run the cell below to create an interactive widget that shows, for each unit, the waveforms and the electrode locations where they were recorded.
+```{python}
+# | eval: false
+%matplotlib widget
+si.plot_unit_waveforms(analyzer, backend="ipywidgets")
+%matplotlib inline
+```
+
+:::{#exm-}
+Compute the unit locations using the `"center_of_mass"` method and print the shape of the returned `unit_locations`.
+:::
+```{python}
+unit_locations = si.compute_unit_locations(analyzer, method="center_of_mass")
+unit_locations.shape
+```
+
+:::{#exm-}
+Get the probe from `rec` and plot it together with the `x` and `y` `unit_locations`.
+:::
+```{python}
+probe = rec.get_probe()
+plot_probe(probe)
+x = unit_locations[:, 0]
+y = unit_locations[:, 1]
+plt.scatter(x, y)
+plt.xlim(-400, 400)
+plt.ylim(0, 800)
+```
+
+:::{#exr-}
+Compute the unit locations using the `"monopolar_triangulation"` method and print the shape of the returned `unit_locations`.
+:::
+:::{.sol}
+```{python}
+unit_locations = si.compute_unit_locations(analyzer, method="monopolar_triangulation")
+unit_locations.shape
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Plot the `probe` together with the `x` and `y` `unit_locations`.
+:::
+:::{.sol}
+```{python}
+probe = rec.get_probe()
+plot_probe(probe)
+x = unit_locations[:, 0]
+y = unit_locations[:, 1]
+plt.scatter(x, y)
+plt.xlim(-400, 400)
+plt.ylim(0, 800)
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exm-}
+Create a 3D plot of the `x`, `y` and `z` `unit_locations`.
+:::
+```{python}
+x = unit_locations[:, 0]
+y = unit_locations[:, 1]
+z = unit_locations[:, 2]
+ax = plt.subplot(projection="3d")
+ax.scatter(x, y, z)
+ax.set(xlim=(-400, 400), ylim=(0, 800))
+```
+
+:::{#exr-}
+Compute the unit locations using the `"grid_convolution"` method and print the shape of the returned `unit_locations`.
+:::
+:::{.sol}
+```{python}
+unit_locations = si.compute_unit_locations(analyzer, method="grid_convolution")
+unit_locations.shape
+```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+Create a 3D plot of the `x`, `y` and `z` `unit_locations`.
+:::
+:::{.sol}
+```{python}
+x = unit_locations[:, 0]
+y = unit_locations[:, 1]
+z = unit_locations[:, 2]
+ax = plt.subplot(projection="3d")
+ax.scatter(x, y, z)
+ax.set(xlim=(-400, 400), ylim=(0, 800))
 ```
 :::
 :::{.direction}

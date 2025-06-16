@@ -62,7 +62,7 @@ In this notebook, our aim is to extract spike waveforms from raw electrophysiolo
 ---
 
 :::{#exr-}
-Load the file `"../data/raw_tetrode_recording.parquet"` into a pandas data frame and print the first 10 rows
+Load the file `"raw_tetrode_recording.parquet"` into a pandas data frame and print the first 10 rows
 :::
 :::{.sol}
 ```{python}
@@ -243,7 +243,7 @@ print('​')
 ```
 :::
 
-:::{#exr}
+:::{#exr-}
 Create a Butterworth `"highpass"` filter with `order=6`, `cutoff=1000` and `fs=30000` and plot its frequency response.
 :::
 :::{.sol}
@@ -284,7 +284,7 @@ print('​')
 ```
 :::
 
-:::{#exr}
+:::{#exr-}
 Create a Butterworth `"bandpass"` filter with `order=6`, `cutoff=[500, 5000]`  and and `fs=30000` and plot its frequency response.
 :::
 :::{.sol}
@@ -589,6 +589,16 @@ plt.plot(df[ch].index, df[ch])
 plt.plot(df[ch].loc[spike_times].index, df[ch].loc[spike_times], "r.")
 plt.xlim(1, 1.5)
 ```
+:::
+:::{.direction}
+```{python}
+#| echo: false
+print('​')
+```
+:::
+
+:::{#exr-}
+BONUS: Change the detection threshold `b*sigma`, then re-compute and plot the `spike_times` to see how the threshold affects the number of detected spikes.`
 :::
 :::{.direction}
 ```{python}

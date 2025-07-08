@@ -12,4 +12,12 @@ response = requests.get(f"{url}/download")
 print("Downloading Data ...")
 with open(fname, "wb") as file:
     file.write(response.content)
-print("Done!")     
+print("Done!")    
+
+## Exercise 1
+df = pd.read_parquet("flash_spikes.parquet")
+print (df.head(5))
+print("All possible questions : 1- what is brain area?LM ")
+print("All possible questions : 2- what is unit for spike_time? Second")
+
+

@@ -46,4 +46,8 @@ Total_number_of_units_recorded =  len(unit)
 ## Exercise 6
 #print ("Total_number_of_spikes:",len(spike_time))
 spike_counts = df.groupby("unit_id")["spike_time"].count()
-print(spike_counts)
+#print(spike_counts)
+
+## Exercise 7
+unit_recorded_in_each_brain_area = df.groupby("brain_area")["unit_id"].count()
+print("unit_recorded_in_each_brain_area:",unit_recorded_in_each_brain_area) 

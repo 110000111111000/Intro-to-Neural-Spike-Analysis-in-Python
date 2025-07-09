@@ -24,8 +24,8 @@ df = pd.read_parquet("flash_spikes.parquet")
 #print ("number of row or spikes in data",df.shape) 
 
 ## Exercise 3 
-print ("name of columns", df.columns)
-#spike_time = df["spike_time"] 
+#print ("name of columns", df.columns)
+spike_time = df["spike_time"] 
 #print (spike_time)
 #first_spike = df["spike_time"].min()
 #last_spike = df["spike_time"].max()
@@ -40,5 +40,18 @@ all_brain_area_recorded = df.brain_area.unique()
 
 ##Exercise 5
 unit =df["unit_id"]
-Total_number_of_units_recorded =  df["unit_id"].nunique()
-print("Total_number_of_units_recorded:",Total_number_of_units_recorded )
+Total_number_of_units_recorded =  len(unit)
+#print("Total_number_of_units_recorded:",Total_number_of_units_recorded )
+
+## Exercise 6
+#print ("Total_number_of_spikes:",len(spike_time))
+spike_counts = df.groupby("unit_id")["spike_time"].count()
+print(spike_counts)
+
+## Exercise 7
+unit_recorded_in_each_brain_area = df.groupby("brain_area")["unit_id"].count()
+#print("unit_recorded_in_each_brain_area:",unit_recorded_in_each_brain_area) 
+
+## Exercise 8
+#spikes_recorded_sigle_unit = df.groupby("unit_id")["spike_time"].count()
+print("Min spikes in a unit:",spike_counts.min(), min(spike_counts),"Max spikes in a unit:", max(spike_counts))

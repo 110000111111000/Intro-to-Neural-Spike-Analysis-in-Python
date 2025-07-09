@@ -49,5 +49,5 @@ spike_counts = df.groupby("unit_id")["spike_time"].count()
 #print(spike_counts)
 
 ## Exercise 7
-unit_recorded_in_each_brain_area = df.groupby("brain_area")["unit_id"].count()
+unit_recorded_in_each_brain_area = df.groupby("brain_area")["unit_id"].nunique()
 print("unit_recorded_in_each_brain_area:",unit_recorded_in_each_brain_area) 

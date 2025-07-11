@@ -43,14 +43,17 @@ stimuli["analysis_window_start"] = stimuli["start_time"] - 0.5
 df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "analysis_window_start")
 #print(df.head(20))
 
-## E5
-df["starTime_subtract_spikeTime"] = stimuli["start_time"] - spikes["spike_time"]
-#print(min(df))
+# E5 – Create a new column for relative spike time
+df["spike_time_relative_to_start"] = df["spike_time"] - df["start_time"]
 
-## E6
-less_than_one_spike_time = df[df.starTime_subtract_spikeTime<1] 
-#print(less_than_one_spike_time)
-#print(max(spikes["spike_time"]))  
+# E6 – Filter for spikes where the relative time is greater than 1 second
+df_filtered = df[df["spike_time_relative_to_start"] > 1]
 
-## E7
-print (sns.histplot(df, x = "starTime_subtract_spikeTime",bins = 10))
+# E7 – Plot histogram of the filtered spike times
+sns.histplot(data=df_filtered, x="spike_time_relative_to_start", bins=50, kde=False)
+plt.xlabel("Spike Time Relative to Stimulus Onset")
+plt.ylabel("Count")
+plt.title("Histogram of Relative Spike Times (> 1 second)")
+plt.show()
+
+

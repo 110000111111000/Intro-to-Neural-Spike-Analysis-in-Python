@@ -26,9 +26,9 @@ from scipy.stats import wilcoxon
 #### E1
 spikes = pd.read_parquet("flash_spikes.parquet")
 #print(df.head(5))
-print(spikes.head(5)) 
+print("Spike DataFrame containing Five rows:",spikes.head(5)) 
 stimuli = pd.read_parquet("flash_stimuli.parquet")
-print(stimuli.head(10))
+print("Stimuli DataFrame containing ten rows:",stimuli.head(10))
 
 
     

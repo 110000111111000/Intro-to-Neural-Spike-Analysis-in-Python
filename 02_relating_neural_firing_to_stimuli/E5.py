@@ -44,6 +44,7 @@ df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "analysis_wi
 #print(df.head(20))
 
 ## E5
-df = stimuli["start_time"] - spikes["spike_time"]
+df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "start_time")
+df = spikes["spike_time"] - stimuli["start_time"]
 print(min(df))
     

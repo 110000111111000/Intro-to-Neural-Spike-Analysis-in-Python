@@ -34,7 +34,7 @@ stimuli = pd.read_parquet("flash_stimuli.parquet")
 
 df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on="start_time")
 print(df.head(10))
-print("Get more information about merge_asof function")
+#print("Get more information about merge_asof function")
 
 
 

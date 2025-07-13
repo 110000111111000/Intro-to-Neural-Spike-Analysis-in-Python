@@ -47,13 +47,13 @@ df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "analysis_wi
 df["spike_time_relative_to_start"] = df["spike_time"] - df["start_time"]
 
 # E6 – Filter for spikes where the relative time is greater than 1 second
-df_filtered = df[df["spike_time_relative_to_start"] > 1]
+#df_filtered = df[df["spike_time_relative_to_start"] > 1]
 
 # E7 – Plot histogram of the filtered spike times
-sns.histplot(data=df_filtered, x="spike_time_relative_to_start", bins=50, kde=False)
+sns.histplot(df["spike_time_relative_to_start"], bins=1000, kde=False)
 plt.xlabel("Spike Time Relative to Stimulus Onset")
 plt.ylabel("Count")
-plt.title("Histogram of Relative Spike Times (> 1 second)")
+plt.title("Histogram of Relative Spike Times")
 plt.show()
 
 #E8 

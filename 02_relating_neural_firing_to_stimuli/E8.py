@@ -54,17 +54,12 @@ sns.histplot(data=df_filtered, x="spike_time_relative_to_start", bins=50, kde=Fa
 plt.xlabel("Spike Time Relative to Stimulus Onset")
 plt.ylabel("Count")
 plt.title("Histogram of Relative Spike Times (> 1 second)")
-plt.show()
+#plt.show()
 
+spike_times = df["spike_time"]
 # E8 ..
-import matplotlib.pyplot as plt
-import seaborn as sns
-
-# Let's pretend these are your spike times in seconds
-spike_times = [0.01, 0.03, 0.07, 0.10, 0.12, 0.30, 0.32, 0.50]
-
 # Make the histogram
-sns.histplot(spike_times, bins=20)
+sns.histplot(spike_times, bins=200)
 
 # Add vertical lines for stimulus start and end
 plt.axvline(0, color="black", linestyle="--", label="Stimulus ON")

@@ -43,22 +43,39 @@ stimuli["analysis_window_start"] = stimuli["start_time"] - 0.5
 df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "analysis_window_start")
 #print(df.head(20))
 
-### ?
-# I would like to ask a question about Exercise 5.
-print('''The question is:
+# E5 – Create a new column for relative spike time
+df["spike_time_relative_to_start"] = df["spike_time"] - df["start_time"]
 
-"Subtract the .start_time column from the .spike_time column to get the spike times relative to stimulus onset. Then, print the smallest spike time in df. This value should be very close to -0.5."
+# E6 – Filter for spikes where the relative time is greater than 1 second
+df_filtered = df[df["spike_time_relative_to_start"] > 1]
 
-To solve the problem, I wrote the following script.
-As a result, I got -296.1868826019397 as the minimum spike time.
-However, I was expecting to get a value around -0.5.''')
+# E7 – Plot histogram of the filtered spike times
+sns.histplot(data=df_filtered, x="spike_time_relative_to_start", bins=50, kde=False)
+plt.xlabel("Spike Time Relative to Stimulus Onset")
+plt.ylabel("Count")
+plt.title("Histogram of Relative Spike Times (> 1 second)")
+plt.show()
+
+# E8 ..
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Let's pretend these are your spike times in seconds
+spike_times = [0.01, 0.03, 0.07, 0.10, 0.12, 0.30, 0.32, 0.50]
+
+# Make the histogram
+sns.histplot(spike_times, bins=20)
+
+# Add vertical lines for stimulus start and end
+plt.axvline(0, color="black", linestyle="--", label="Stimulus ON")
+plt.axvline(0.25, color="black", linestyle="--", label="Stimulus OFF")
+
+# Add labels
+plt.xlabel("Time (s)")
+plt.ylabel("Spike Count")
+plt.title("Neural Spike Times with Stimulus Markers")
+plt.legend()
+plt.show()
 
 
 
-
-
-## E5
-df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "start_time")
-df = spikes["spike_time"] - stimuli["start_time"]
-print(min(df))
-    

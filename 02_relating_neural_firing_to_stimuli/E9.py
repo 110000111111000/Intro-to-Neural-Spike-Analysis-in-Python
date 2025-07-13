@@ -54,8 +54,36 @@ sns.histplot(data=df_filtered, x="spike_time_relative_to_start", bins=50, kde=Fa
 plt.xlabel("Spike Time Relative to Stimulus Onset")
 plt.ylabel("Count")
 plt.title("Histogram of Relative Spike Times (> 1 second)")
+#plt.show()
+
+# E8 ..
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# Let's pretend these are your spike times in seconds
+spike_times = [0.01, 0.03, 0.07, 0.10, 0.12, 0.30, 0.32, 0.50]
+
+# Make the histogram
+sns.histplot(spike_times, bins=20)
+
+# Add vertical lines for stimulus start and end
+plt.axvline(0, color="black", linestyle="--", label="Stimulus ON")
+plt.axvline(0.25, color="black", linestyle="--", label="Stimulus OFF")
+
+# Add labels
+plt.xlabel("Time (s)")
+plt.ylabel("Spike Count")
+plt.title("Neural Spike Times with Stimulus Markers")
+plt.legend()
+#plt.show()
+
+# Assuming you have a DataFrame `df` with columns: "value" and "brain_area"
+# Replace "value" with the actual column you're plotting on the x-axis
+
+
+sns.histplot(data=df, x="spike_time", hue="brain_area", element="step", stat="count", common_norm=False)
+plt.title("Spike Time Distribution by Brain Area")
+plt.xlabel("Spike Time")
+plt.ylabel("Count")
 plt.show()
-
-#E8 
-
 

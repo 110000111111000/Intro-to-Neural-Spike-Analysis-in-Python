@@ -45,9 +45,9 @@ df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "analysis_wi
 
 ## E5
 df["starTime_subtract_spikeTime"] = spikes["spike_time"] - stimuli["start_time"]
-#print(min(df))
+print((df.starTime_subtract_spikeTime.head(10)))
 
 ## E6
-less_than_one_spike_time = df[df.starTime_subtract_spikeTime > 1] 
-print(less_than_one_spike_time)
-print(max(spikes["spike_time"]))   
+greater_than_one_spike_time = df[df["starTime_subtract_spikeTime"] > 1] 
+print(greater_than_one_spike_time)
+#print(max(spikes["spike_time"]))   

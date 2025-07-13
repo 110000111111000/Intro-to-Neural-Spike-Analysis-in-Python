@@ -51,7 +51,7 @@ print('''The question is:
 
 To solve the problem, I wrote the following script.
 As a result, I got -296.1868826019397 as the minimum spike time.
-However, I was expecting to get a value around -0.5.''')
+However, I was expected to get a value around -0.5.''')
 
 
 
@@ -59,6 +59,6 @@ However, I was expecting to get a value around -0.5.''')
 
 ## E5
 df = pd.merge_asof(spikes, stimuli, left_on="spike_time", right_on= "start_time")
-df = spikes["spike_time"] - stimuli["start_time"]
-print(min(df))
+df["spike_time_start_time"] = spikes["spike_time"] - stimuli["start_time"]
+print(min(df["spike_time_start_time"]))
     

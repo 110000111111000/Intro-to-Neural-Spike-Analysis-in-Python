@@ -57,12 +57,13 @@ plt.title("Histogram of Relative Spike Times (> 1 second)")
 #plt.show()
 
 # E8 ..
-import matplotlib.pyplot as plt
-import seaborn as sns
+#import matplotlib.pyplot as plt
+#import seaborn as sns
 
 # Let's pretend these are your spike times in seconds
-spike_times = [0.01, 0.03, 0.07, 0.10, 0.12, 0.30, 0.32, 0.50]
+#spike_times = [0.01, 0.03, 0.07, 0.10, 0.12, 0.30, 0.32, 0.50]
 
+spike_times = df["spike_time"]
 # Make the histogram
 sns.histplot(spike_times, bins=20)
 
